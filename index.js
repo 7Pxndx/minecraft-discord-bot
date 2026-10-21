@@ -15,67 +15,126 @@ import {
 import http from "node:http";
 
 // ======================================================
+// BLOCKBANDE NETWORK
+// Minecraft Discord Server Status Bot
+// ======================================================
+
+// ======================================================
 // CONFIG
 // ======================================================
 
 const PORT = process.env.PORT || 10000;
 
-const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID;
-const CHANNEL_ID = process.env.CHANNEL_ID;
-const RESPAWNHOST_API_KEY = process.env.RESPAWNHOST_API_KEY;
+const DISCORD_TOKEN =
+  process.env.DISCORD_TOKEN;
+
+const CLIENT_ID =
+  process.env.CLIENT_ID;
+
+const CHANNEL_ID =
+  process.env.CHANNEL_ID;
+
+const RESPAWNHOST_API_KEY =
+  process.env.RESPAWNHOST_API_KEY;
+
+// Feste Serverdaten
+const SERVER_IP =
+  "5.175.214.105:25581";
+
+const NETWORK_NAME =
+  "BLOCKBANDE NETWORK";
+
+const SERVER_FALLBACK_NAME =
+  "BlockBanDE";
+
+// Update alle 60 Sekunden
+const UPDATE_INTERVAL =
+  60 * 1000;
+
+// ======================================================
+// ENVIRONMENT CHECK
+// ======================================================
 
 if (!DISCORD_TOKEN) {
-  throw new Error("DISCORD_TOKEN fehlt.");
+  throw new Error(
+    "DISCORD_TOKEN fehlt."
+  );
 }
 
 if (!CLIENT_ID) {
-  throw new Error("CLIENT_ID fehlt.");
+  throw new Error(
+    "CLIENT_ID fehlt."
+  );
 }
 
 if (!CHANNEL_ID) {
-  throw new Error("CHANNEL_ID fehlt.");
+  throw new Error(
+    "CHANNEL_ID fehlt."
+  );
 }
 
 if (!RESPAWNHOST_API_KEY) {
-  throw new Error("RESPAWNHOST_API_KEY fehlt.");
+  throw new Error(
+    "RESPAWNHOST_API_KEY fehlt."
+  );
 }
 
 // ======================================================
 // RENDER WEB SERVER
 // ======================================================
 
-const webServer = http.createServer((req, res) => {
-  res.writeHead(200, {
-    "Content-Type": "text/plain; charset=utf-8"
-  });
+const webServer =
+  http.createServer(
+    (req, res) => {
 
-  res.end("Minecraft Discord Bot läuft.");
-});
+      res.writeHead(
+        200,
+        {
+          "Content-Type":
+            "text/plain; charset=utf-8"
+        }
+      );
 
-webServer.listen(PORT, () => {
-  console.log(`🌐 Webserver läuft auf Port ${PORT}`);
-});
+      res.end(
+        "BLOCKBANDE NETWORK Bot läuft."
+      );
+    }
+  );
+
+webServer.listen(
+  PORT,
+  () => {
+    console.log(
+      `🌐 Webserver läuft auf Port ${PORT}`
+    );
+  }
+);
 
 // ======================================================
 // DISCORD CLIENT
 // ======================================================
 
-const discord = new Client({
-  intents: [
-    GatewayIntentBits.Guilds
-  ]
-});
+const discord =
+  new Client({
+    intents: [
+      GatewayIntentBits.Guilds
+    ]
+  });
 
 // ======================================================
 // RESPAWNHOST
 // ======================================================
 
-const respawnHost = new RespawnHostClient({
-  apiKey: RESPAWNHOST_API_KEY
-});
+const respawnHost =
+  new RespawnHostClient({
+    apiKey:
+      RESPAWNHOST_API_KEY
+  });
 
-const servers = new ServersService(respawnHost);
+const servers =
+  new ServersService(
+    respawnHost
+  );
 
 let serverUuid = null;
 
@@ -84,8 +143,11 @@ let serverUuid = null;
 // ======================================================
 
 async function findServer() {
+
   try {
-    const result = await servers.list();
+
+    const result =
+      await servers.list();
 
     const serverList =
       Array.isArray(result)
@@ -94,22 +156,34 @@ async function findServer() {
           result?.servers ??
           [];
 
-    if (!serverList.length) {
-      console.log("❌ Kein RespawnHost Server gefunden.");
+    if (
+      !serverList.length
+    ) {
+
+      console.log(
+        "❌ Kein RespawnHost Server gefunden."
+      );
+
       return null;
     }
 
     const foundServer =
-      serverList.find((server) => {
-        const name =
-          server?.alias ??
-          server?.name ??
-          "";
+      serverList.find(
+        (server) => {
 
-        return String(name)
-          .toLowerCase()
-          .includes("blockbande");
-      }) ?? serverList[0];
+          const name =
+            server?.alias ??
+            server?.name ??
+            "";
+
+          return String(name)
+            .toLowerCase()
+            .includes(
+              "blockbande"
+            );
+        }
+      ) ??
+      serverList[0];
 
     serverUuid =
       foundServer?.panelUuid ??
@@ -117,13 +191,15 @@ async function findServer() {
       foundServer?.id ??
       null;
 
-    console.log("🎮 RespawnHost Server gefunden");
+    console.log(
+      "🎮 RespawnHost Server gefunden"
+    );
 
     console.log(
       "Name:",
       foundServer?.alias ??
       foundServer?.name ??
-      "Unbekannt"
+      SERVER_FALLBACK_NAME
     );
 
     console.log(
@@ -134,6 +210,7 @@ async function findServer() {
     return foundServer;
 
   } catch (error) {
+
     console.error(
       "❌ Fehler beim Suchen des Servers:",
       error
@@ -148,34 +225,45 @@ async function findServer() {
 // ======================================================
 
 async function getServerDetails() {
+
   if (!serverUuid) {
     return null;
   }
 
   try {
-    const response = await fetch(
-      `https://respawnhost.com/api/v1/servers/${serverUuid}`,
-      {
-        headers: {
-          "X-Api-Key": RESPAWNHOST_API_KEY,
-          "Accept": "application/json"
+
+    const response =
+      await fetch(
+        `https://respawnhost.com/api/v1/servers/${serverUuid}`,
+        {
+          headers: {
+            "X-Api-Key":
+              RESPAWNHOST_API_KEY,
+
+            "Accept":
+              "application/json"
+          }
         }
-      }
-    );
+      );
 
     if (!response.ok) {
+
       throw new Error(
         `HTTP ${response.status}`
       );
     }
 
-    const data = await response.json();
+    const data =
+      await response.json();
 
-    console.log("✅ Serverdetails geladen.");
+    console.log(
+      "✅ Serverdetails geladen."
+    );
 
     return data;
 
   } catch (error) {
+
     console.error(
       "❌ Fehler beim Laden der Serverdetails:",
       error
@@ -189,42 +277,62 @@ async function getServerDetails() {
 // RECURSIVE VALUE FINDER
 // ======================================================
 
-function findValue(object, keys) {
+function findValue(
+  object,
+  keys
+) {
+
   if (
     object === null ||
     object === undefined ||
-    typeof object !== "object"
+    typeof object !==
+      "object"
   ) {
     return null;
   }
 
   const wantedKeys =
-    keys.map((key) =>
-      String(key).toLowerCase()
+    keys.map(
+      (key) =>
+        String(key).toLowerCase()
     );
 
-  for (const [key, value] of Object.entries(object)) {
+  for (
+    const [key, value]
+    of Object.entries(object)
+  ) {
+
     if (
       wantedKeys.includes(
         String(key).toLowerCase()
       )
     ) {
+
       return value;
     }
   }
 
-  for (const value of Object.values(object)) {
+  for (
+    const value
+    of Object.values(object)
+  ) {
+
     if (
       value &&
-      typeof value === "object"
+      typeof value ===
+        "object"
     ) {
+
       const found =
         findValue(
           value,
           keys
         );
 
-      if (found !== null) {
+      if (
+        found !== null
+      ) {
+
         return found;
       }
     }
@@ -234,7 +342,7 @@ function findValue(object, keys) {
 }
 
 // ======================================================
-// STATUS AUS RESPawnhost DATEN ERMITTELN
+// SERVER STATE
 // ======================================================
 
 function getServerState(
@@ -242,6 +350,7 @@ function getServerState(
   details,
   resources
 ) {
+
   const combinedData = {
     server,
     details,
@@ -274,6 +383,7 @@ function getServerState(
     state === null ||
     state === undefined
   ) {
+
     return "";
   }
 
@@ -291,6 +401,7 @@ function isServerOnline(
   details,
   resources
 ) {
+
   const state =
     getServerState(
       server,
@@ -317,7 +428,9 @@ function isServerOnline(
 // ======================================================
 
 async function getStatus() {
+
   try {
+
     const server =
       await findServer();
 
@@ -328,14 +441,18 @@ async function getStatus() {
     const details =
       await getServerDetails();
 
-    let resources = null;
+    let resources =
+      null;
 
     try {
+
       resources =
         await servers.getResourceUtilization(
           serverUuid
         );
+
     } catch (error) {
+
       console.error(
         "⚠️ Ressourcen konnten nicht geladen werden:",
         error
@@ -357,14 +474,16 @@ async function getStatus() {
 
     console.log(
       "CPU:",
-      resources?.resources?.cpu_absolute ??
-      "N/A"
+      resources?.resources
+        ?.cpu_absolute ??
+        "N/A"
     );
 
     console.log(
       "RAM Bytes:",
-      resources?.resources?.memory_bytes ??
-      "N/A"
+      resources?.resources
+        ?.memory_bytes ??
+        "N/A"
     );
 
     console.log(
@@ -378,6 +497,7 @@ async function getStatus() {
     };
 
   } catch (error) {
+
     console.error(
       "❌ Fehler beim Abrufen des Status:",
       error
@@ -395,6 +515,7 @@ function getPlayers(
   server,
   details
 ) {
+
   const combinedData = {
     server,
     details
@@ -410,31 +531,43 @@ function getPlayers(
         "currentPlayers",
         "onlinePlayers",
         "player_count",
-        "players_online",
-        "online"
+        "players_online"
       ]
     );
 
-  if (typeof value === "number") {
+  if (
+    typeof value ===
+    "number"
+  ) {
+
     return value;
   }
 
   if (
-    typeof value === "string" &&
+    typeof value ===
+    "string" &&
     value.trim() !== ""
   ) {
+
     const number =
       Number(value);
 
-    if (!Number.isNaN(number)) {
+    if (
+      !Number.isNaN(
+        number
+      )
+    ) {
+
       return number;
     }
   }
 
   if (
     value &&
-    typeof value === "object"
+    typeof value ===
+      "object"
   ) {
+
     const nested =
       findValue(
         value,
@@ -446,17 +579,28 @@ function getPlayers(
         ]
       );
 
-    if (typeof nested === "number") {
+    if (
+      typeof nested ===
+      "number"
+    ) {
+
       return nested;
     }
 
     if (
-      typeof nested === "string"
+      typeof nested ===
+      "string"
     ) {
+
       const number =
         Number(nested);
 
-      if (!Number.isNaN(number)) {
+      if (
+        !Number.isNaN(
+          number
+        )
+      ) {
+
         return number;
       }
     }
@@ -473,6 +617,7 @@ function getMaxPlayers(
   server,
   details
 ) {
+
   const combinedData = {
     server,
     details
@@ -487,22 +632,32 @@ function getMaxPlayers(
         "maxPlayerCount",
         "playersMax",
         "max_players",
-        "player_limit",
-        "max"
+        "player_limit"
       ]
     );
 
-  if (typeof value === "number") {
+  if (
+    typeof value ===
+    "number"
+  ) {
+
     return value;
   }
 
   if (
-    typeof value === "string"
+    typeof value ===
+    "string"
   ) {
+
     const number =
       Number(value);
 
-    if (!Number.isNaN(number)) {
+    if (
+      !Number.isNaN(
+        number
+      )
+    ) {
+
       return number;
     }
   }
@@ -514,21 +669,31 @@ function getMaxPlayers(
 // CPU
 // ======================================================
 
-function getCpu(resources) {
+function getCpu(
+  resources
+) {
+
   const cpu =
-    resources?.resources?.cpu_absolute;
+    resources?.resources
+      ?.cpu_absolute;
 
   if (
     cpu === null ||
     cpu === undefined
   ) {
+
     return "N/A";
   }
 
   const number =
     Number(cpu);
 
-  if (Number.isNaN(number)) {
+  if (
+    Number.isNaN(
+      number
+    )
+  ) {
+
     return "N/A";
   }
 
@@ -539,21 +704,31 @@ function getCpu(resources) {
 // RAM
 // ======================================================
 
-function getRam(resources) {
+function getRam(
+  resources
+) {
+
   const bytes =
-    resources?.resources?.memory_bytes;
+    resources?.resources
+      ?.memory_bytes;
 
   if (
     bytes === null ||
     bytes === undefined
   ) {
+
     return "N/A";
   }
 
   const number =
     Number(bytes);
 
-  if (Number.isNaN(number)) {
+  if (
+    Number.isNaN(
+      number
+    )
+  ) {
+
     return "N/A";
   }
 
@@ -563,7 +738,10 @@ function getRam(resources) {
     1024 /
     1024;
 
-  if (gb >= 1) {
+  if (
+    gb >= 1
+  ) {
+
     return `${gb.toFixed(2)} GB`;
   }
 
@@ -583,34 +761,75 @@ function getPlayerBar(
   players,
   maxPlayers
 ) {
+
   if (
     players === null ||
     maxPlayers === null ||
     maxPlayers <= 0
   ) {
+
     return "▱▱▱▱▱▱▱▱▱▱";
   }
 
-  const totalBlocks = 10;
+  const totalBlocks =
+    10;
 
   const percentage =
     Math.min(
-      players / maxPlayers,
+      players /
+        maxPlayers,
       1
     );
 
   const filled =
     Math.round(
       percentage *
-      totalBlocks
+        totalBlocks
     );
 
   return (
-    "▰".repeat(filled) +
+    "▰".repeat(
+      filled
+    ) +
     "▱".repeat(
-      totalBlocks - filled
+      totalBlocks -
+        filled
     )
   );
+}
+
+// ======================================================
+// UPTIME TEXT
+// ======================================================
+
+function getStatusText(
+  online
+) {
+
+  if (online) {
+
+    return {
+      title:
+        "ONLINE",
+
+      description:
+        "All systems operational",
+
+      color:
+        0x22c55e
+    };
+  }
+
+  return {
+    title:
+      "OFFLINE",
+
+    description:
+      "Server is currently unavailable",
+
+    color:
+      0xef4444
+  };
 }
 
 // ======================================================
@@ -622,6 +841,7 @@ function createEmbed(
   details,
   resources
 ) {
+
   const online =
     isServerOnline(
       server,
@@ -655,89 +875,190 @@ function createEmbed(
     );
 
   const cpu =
-    getCpu(resources);
+    getCpu(
+      resources
+    );
 
   const ram =
-    getRam(resources);
+    getRam(
+      resources
+    );
 
   const serverName =
     server?.alias ??
     server?.name ??
-    "BlockBanDE";
+    SERVER_FALLBACK_NAME;
 
-  const statusText =
-    online
-      ? "ONLINE"
-      : "OFFLINE";
+  const status =
+    getStatusText(
+      online
+    );
 
-  const statusDescription =
-    online
-      ? "All systems operational"
-      : "Server is currently unavailable";
+  const state =
+    getServerState(
+      server,
+      details,
+      resources
+    );
 
-  const statusColor =
-    online
-      ? 0x22c55e
-      : 0xef4444;
+  let systemText;
+
+  if (online) {
+
+    systemText =
+      "🟢 **Operational**";
+
+  } else if (
+    state === "starting" ||
+    state === "start"
+  ) {
+
+    systemText =
+      "🟡 **Starting**";
+
+  } else {
+
+    systemText =
+      "🔴 **Offline**";
+  }
 
   return new EmbedBuilder()
-    .setColor(statusColor)
+
+    // ==================================================
+    // MAIN COLOR
+    // ==================================================
+
+    .setColor(
+      status.color
+    )
+
+    // ==================================================
+    // HEADER
+    // ==================================================
 
     .setAuthor({
-      name: "BLOCKBANDE NETWORK"
+      name:
+        `${NETWORK_NAME} • SERVER MONITOR`
     })
 
     .setTitle(
-      serverName
+      `⛏️ ${serverName}`
     )
 
     .setDescription(
-      `**● ${statusText}**\n${statusDescription}`
+      online
+        ? `🟢 **ONLINE**\n${status.description}`
+        : `🔴 **OFFLINE**\n${status.description}`
     )
 
+    // ==================================================
+    // SERVER INFORMATION
+    // ==================================================
+
     .addFields({
-      name: "SERVER ADDRESS",
+
+      name:
+        "🌐 SERVER ADDRESS",
+
       value:
-        "`5.175.214.105:25581`",
-      inline: false
+        `\`${SERVER_IP}\``,
+
+      inline:
+        false
     })
 
     .addFields(
+
       {
-        name: "PLAYERS",
+        name:
+          "👥 PLAYERS",
+
         value:
           `${playerText}\n` +
           `\`${playerBar}\``,
-        inline: true
+
+        inline:
+          true
       },
+
       {
-        name: "CPU LOAD",
+        name:
+          "⚡ CPU LOAD",
+
         value:
           `**${cpu}**\n` +
           "Processor usage",
-        inline: true
+
+        inline:
+          true
       },
+
       {
-        name: "MEMORY",
+        name:
+          "🧠 MEMORY",
+
         value:
           `**${ram}**\n` +
           "Memory usage",
-        inline: true
+
+        inline:
+          true
       }
     )
 
+    // ==================================================
+    // SYSTEM STATUS
+    // ==================================================
+
     .addFields({
-      name: "SYSTEM STATUS",
+
+      name:
+        "📡 SYSTEM STATUS",
+
       value:
-        online
-          ? "● **Operational**"
-          : "● **Offline**",
-      inline: false
+        `${systemText}\n` +
+        `\`${state || "unknown"}\``,
+
+      inline:
+        false
     })
 
+    // ==================================================
+    // NETWORK
+    // ==================================================
+
+    .addFields({
+
+      name:
+        "🛡️ NETWORK",
+
+      value:
+        "BlockBanDE Minecraft Network",
+
+      inline:
+        true
+    })
+
+    .addFields({
+
+      name:
+        "🔄 UPDATE",
+
+      value:
+        "Automatic • 60 seconds",
+
+      inline:
+        true
+    })
+
+    // ==================================================
+    // FOOTER
+    // ==================================================
+
     .setFooter({
+
       text:
-        "BLOCKBANDE NETWORK • LIVE SERVER STATUS"
+        `${NETWORK_NAME} • LIVE SERVER MONITOR`
     })
 
     .setTimestamp();
@@ -748,13 +1069,16 @@ function createEmbed(
 // ======================================================
 
 async function updateStatus() {
+
   try {
+
     const channel =
       await discord.channels.fetch(
         CHANNEL_ID
       );
 
     if (!channel) {
+
       console.error(
         "❌ Discord Channel nicht gefunden."
       );
@@ -766,6 +1090,7 @@ async function updateStatus() {
       await getStatus();
 
     if (!status) {
+
       console.error(
         "❌ Kein Serverstatus verfügbar."
       );
@@ -788,22 +1113,30 @@ async function updateStatus() {
 
     const messages =
       await channel.messages.fetch({
-        limit: 10
+        limit:
+          20
       });
 
     const existingMessage =
       messages.find(
         (message) =>
+
           message.author?.id ===
             discord.user.id &&
-          message.embeds?.[0]?.author
-            ?.name ===
-            "BLOCKBANDE NETWORK"
+
+          message.embeds?.[0]
+            ?.author?.name ===
+            `${NETWORK_NAME} • SERVER MONITOR`
       );
 
-    if (existingMessage) {
+    if (
+      existingMessage
+    ) {
+
       await existingMessage.edit({
-        embeds: [embed]
+        embeds: [
+          embed
+        ]
       });
 
       console.log(
@@ -811,8 +1144,11 @@ async function updateStatus() {
       );
 
     } else {
+
       await channel.send({
-        embeds: [embed]
+        embeds: [
+          embed
+        ]
       });
 
       console.log(
@@ -821,6 +1157,7 @@ async function updateStatus() {
     }
 
   } catch (error) {
+
     console.error(
       "❌ Fehler beim Aktualisieren der Status-Nachricht:",
       error
@@ -833,17 +1170,24 @@ async function updateStatus() {
 // ======================================================
 
 const commands = [
+
   new SlashCommandBuilder()
-    .setName("status")
+
+    .setName(
+      "status"
+    )
+
     .setDescription(
       "Zeigt den aktuellen Minecraft Server Status."
     )
+
     .toJSON()
 ];
 
 const rest =
   new REST({
-    version: "10"
+    version:
+      "10"
   }).setToken(
     DISCORD_TOKEN
   );
@@ -855,17 +1199,22 @@ const rest =
 discord.once(
   "clientReady",
   async () => {
+
     console.log(
       `🤖 Bot online: ${discord.user.tag}`
     );
 
     try {
+
       await rest.put(
+
         Routes.applicationCommands(
           CLIENT_ID
         ),
+
         {
-          body: commands
+          body:
+            commands
         }
       );
 
@@ -874,17 +1223,20 @@ discord.once(
       );
 
     } catch (error) {
+
       console.error(
         "❌ Slash Command Fehler:",
         error
       );
     }
 
+    // Erste Statusmeldung
     await updateStatus();
 
+    // Danach jede Minute
     setInterval(
       updateStatus,
-      60000
+      UPDATE_INTERVAL
     );
   }
 );
@@ -895,11 +1247,14 @@ discord.once(
 
 discord.on(
   "interactionCreate",
-  async (interaction) => {
+  async (
+    interaction
+  ) => {
 
     if (
       !interaction.isChatInputCommand()
     ) {
+
       return;
     }
 
@@ -907,16 +1262,19 @@ discord.on(
       interaction.commandName !==
       "status"
     ) {
+
       return;
     }
 
     try {
+
       await interaction.deferReply();
 
       const status =
         await getStatus();
 
       if (!status) {
+
         await interaction.editReply(
           "❌ Der Serverstatus konnte nicht geladen werden."
         );
@@ -932,10 +1290,15 @@ discord.on(
         );
 
       await interaction.editReply({
-        embeds: [embed]
+
+        embeds: [
+          embed
+        ]
+
       });
 
     } catch (error) {
+
       console.error(
         "❌ /status Fehler:",
         error
@@ -945,6 +1308,7 @@ discord.on(
         interaction.deferred ||
         interaction.replied
       ) {
+
         await interaction.editReply(
           "❌ Beim Abrufen des Serverstatus ist ein Fehler aufgetreten."
         );
