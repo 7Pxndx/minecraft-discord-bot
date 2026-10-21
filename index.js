@@ -92,7 +92,6 @@ async function findServer() {
   console.log("🎮 RespawnHost Server gefunden");
   console.log("Name:", server.alias ?? server.name ?? "Unbekannt");
   console.log("UUID:", serverUuid);
-  console.log("State:", server.state);
   console.log("=================================");
 
   return server;
@@ -105,20 +104,35 @@ async function findServer() {
 async function getStatus() {
   const server = await findServer();
 
+  let details = null;
   let resources = null;
 
+  // Serverdetails abrufen
+  try {
+    details = await servers.get(serverUuid);
+
+    console.log("========== SERVER DETAILS ==========");
+    console.log(JSON.stringify(details, null, 2));
+    console.log("====================================");
+  } catch (error) {
+    console.log("❌ Serverdetails konnten nicht geladen werden.");
+    console.error(error);
+  }
+
+  // CPU / RAM abrufen
   try {
     resources = await servers.getResourceUtilization(serverUuid);
 
-    console.log(
-      `⚡ CPU: ${resources.cpu}% | 🧠 RAM: ${resources.memory} MB`
-    );
+    console.log("========== RESOURCES ===============");
+    console.log(JSON.stringify(resources, null, 2));
+    console.log("====================================");
   } catch (error) {
-    console.log("⚠️ Ressourcen momentan nicht verfügbar.");
+    console.log("❌ Ressourcen konnten nicht geladen werden.");
+    console.error(error);
   }
 
   return {
-    server,
+    server: details ?? server,
     resources
   };
 }
@@ -128,13 +142,19 @@ async function getStatus() {
 // =========================
 
 function isServerOnline(server) {
-  const state = String(server.state ?? "").toUpperCase();
+  const state = String(
+    server?.state ??
+    server?.status ??
+    server?.powerState ??
+    ""
+  ).toUpperCase();
 
   console.log("🔎 Server State:", state);
 
   return (
     state === "RUNNING" ||
-    state === "ONLINE"
+    state === "ONLINE" ||
+    state === "STARTED"
   );
 }
 
@@ -144,29 +164,90 @@ function isServerOnline(server) {
 
 function getPlayers(server) {
   const players =
-    server.players ??
-    server.playerCount ??
-    server.playersOnline ??
-    server.currentPlayers;
+    server?.players ??
+    server?.playerCount ??
+    server?.playersOnline ??
+    server?.currentPlayers ??
+    server?.playerCountCurrent;
 
   if (typeof players === "number") {
     return players;
   }
 
+  if (players && typeof players === "object") {
+    return (
+      players.online ??
+      players.current ??
+      players.count ??
+      null
+    );
+  }
+
   return null;
 }
 
+// =========================
+// Maximale Spielerzahl
+// =========================
+
 function getMaxPlayers(server) {
   const maxPlayers =
-    server.maxPlayers ??
-    server.playerLimit ??
-    server.maxPlayerCount;
+    server?.maxPlayers ??
+    server?.playerLimit ??
+    server?.maxPlayerCount ??
+    server?.playersMax;
 
   if (typeof maxPlayers === "number") {
     return maxPlayers;
   }
 
+  if (maxPlayers && typeof maxPlayers === "object") {
+    return (
+      maxPlayers.max ??
+      maxPlayers.limit ??
+      maxPlayers.count ??
+      null
+    );
+  }
+
   return null;
+}
+
+// =========================
+// CPU
+// =========================
+
+function getCpu(resources) {
+  const cpu =
+    resources?.cpu ??
+    resources?.cpuUsage ??
+    resources?.usage?.cpu ??
+    resources?.data?.cpu;
+
+  if (typeof cpu === "number") {
+    return `${cpu}%`;
+  }
+
+  return "Nicht verfügbar";
+}
+
+// =========================
+// RAM
+// =========================
+
+function getRam(resources) {
+  const memory =
+    resources?.memory ??
+    resources?.ram ??
+    resources?.memoryUsage ??
+    resources?.usage?.memory ??
+    resources?.data?.memory;
+
+  if (typeof memory === "number") {
+    return `${memory} MB`;
+  }
+
+  return "Nicht verfügbar";
 }
 
 // =========================
@@ -184,17 +265,10 @@ function createEmbed(server, resources) {
       ? `${players}${maxPlayers !== null ? ` / ${maxPlayers}` : ""}`
       : "Nicht verfügbar";
 
-  const cpu =
-    resources?.cpu != null
-      ? `${resources.cpu}%`
-      : "Nicht verfügbar";
+  const cpu = getCpu(resources);
+  const ram = getRam(resources);
 
-  const ram =
-    resources?.memory != null
-      ? `${resources.memory} MB`
-      : "Nicht verfügbar";
-
-  const embed = new EmbedBuilder()
+  return new EmbedBuilder()
     .setTitle("🎮 Minecraft Server")
     .setDescription(
       online
@@ -222,8 +296,6 @@ function createEmbed(server, resources) {
       text: "RespawnHost • Automatischer Status"
     })
     .setTimestamp();
-
-  return embed;
 }
 
 // =========================
