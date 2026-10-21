@@ -7,11 +7,15 @@ import {
   SlashCommandBuilder
 } from "discord.js";
 
-import { RespawnHostClient, ServersService } from "@respawnhost/sdk";
+import {
+  RespawnHostClient,
+  ServersService
+} from "@respawnhost/sdk";
+
 import http from "node:http";
 
 // =========================
-// Render Web Service
+// Render Webserver
 // =========================
 
 const port = Number(process.env.PORT || 10000);
@@ -25,7 +29,7 @@ const webServer = http.createServer((req, res) => {
 });
 
 webServer.listen(port, "0.0.0.0", () => {
-  console.log(`Webserver läuft auf Port ${port}`);
+  console.log(`🌐 Webserver läuft auf Port ${port}`);
 });
 
 // =========================
@@ -45,7 +49,7 @@ if (
   !CHANNEL_ID ||
   !RESPAWNHOST_API_KEY
 ) {
-  console.error("❌ Es fehlen Environment Variables.");
+  console.error("❌ Environment Variables fehlen.");
   process.exit(1);
 }
 
@@ -70,7 +74,7 @@ const servers = new ServersService(respawnHost);
 let serverUuid = null;
 
 // =========================
-// Server finden
+// Server suchen
 // =========================
 
 async function findServer() {
@@ -84,14 +88,18 @@ async function findServer() {
 
   serverUuid = server.panelUuid;
 
-  console.log(`Minecraft Server gefunden: ${server.name}`);
-  console.log(`Server UUID: ${serverUuid}`);
+  console.log("=================================");
+  console.log("🎮 RespawnHost Server gefunden");
+  console.log("Name:", server.alias ?? server.name ?? "Unbekannt");
+  console.log("UUID:", serverUuid);
+  console.log("State:", server.state);
+  console.log("=================================");
 
   return server;
 }
 
 // =========================
-// Server Status
+// Status + Ressourcen
 // =========================
 
 async function getStatus() {
@@ -100,11 +108,13 @@ async function getStatus() {
   let resources = null;
 
   try {
-    if (serverUuid) {
-      resources = await servers.getResourceUtilization(serverUuid);
-    }
+    resources = await servers.getResourceUtilization(serverUuid);
+
+    console.log(
+      `⚡ CPU: ${resources.cpu}% | 🧠 RAM: ${resources.memory} MB`
+    );
   } catch (error) {
-    console.log("⚠️ Ressourcen konnten nicht geladen werden.");
+    console.log("⚠️ Ressourcen momentan nicht verfügbar.");
   }
 
   return {
@@ -114,53 +124,87 @@ async function getStatus() {
 }
 
 // =========================
-// Discord Embed
+// ONLINE erkennen
 // =========================
 
-function createEmbed(server, resources) {
-  const state = String(
-    server.state ??
-    server.status ??
-    ""
-  ).toLowerCase();
+function isServerOnline(server) {
+  const state = String(server.state ?? "").toUpperCase();
 
-  const isOnline =
-    state === "running" ||
-    state === "online" ||
-    server.online === true;
+  console.log("🔎 Server State:", state);
 
+  return (
+    state === "RUNNING" ||
+    state === "ONLINE"
+  );
+}
+
+// =========================
+// Spielerzahl
+// =========================
+
+function getPlayers(server) {
   const players =
     server.players ??
     server.playerCount ??
     server.playersOnline ??
-    0;
+    server.currentPlayers;
 
+  if (typeof players === "number") {
+    return players;
+  }
+
+  return null;
+}
+
+function getMaxPlayers(server) {
   const maxPlayers =
     server.maxPlayers ??
     server.playerLimit ??
-    "?";
+    server.maxPlayerCount;
+
+  if (typeof maxPlayers === "number") {
+    return maxPlayers;
+  }
+
+  return null;
+}
+
+// =========================
+// Discord Embed
+// =========================
+
+function createEmbed(server, resources) {
+  const online = isServerOnline(server);
+
+  const players = getPlayers(server);
+  const maxPlayers = getMaxPlayers(server);
+
+  const playerText =
+    players !== null
+      ? `${players}${maxPlayers !== null ? ` / ${maxPlayers}` : ""}`
+      : "Nicht verfügbar";
 
   const cpu =
     resources?.cpu != null
       ? `${resources.cpu}%`
-      : "?";
+      : "Nicht verfügbar";
 
-  const memory =
+  const ram =
     resources?.memory != null
       ? `${resources.memory} MB`
-      : "?";
+      : "Nicht verfügbar";
 
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setTitle("🎮 Minecraft Server")
     .setDescription(
-      isOnline
+      online
         ? "🟢 **Der Server ist ONLINE**"
         : "🔴 **Der Server ist OFFLINE**"
     )
     .addFields(
       {
         name: "👥 Spieler",
-        value: `${players} / ${maxPlayers}`,
+        value: playerText,
         inline: true
       },
       {
@@ -170,7 +214,7 @@ function createEmbed(server, resources) {
       },
       {
         name: "🧠 RAM",
-        value: memory,
+        value: ram,
         inline: true
       }
     )
@@ -178,10 +222,12 @@ function createEmbed(server, resources) {
       text: "RespawnHost • Automatischer Status"
     })
     .setTimestamp();
+
+  return embed;
 }
 
 // =========================
-// Status Nachricht aktualisieren
+// Discord Status Nachricht
 // =========================
 
 async function updateStatus() {
@@ -189,7 +235,7 @@ async function updateStatus() {
     const channel = await discord.channels.fetch(CHANNEL_ID);
 
     if (!channel || !channel.isTextBased()) {
-      throw new Error("Der angegebene Discord-Kanal wurde nicht gefunden.");
+      throw new Error("Discord-Kanal nicht gefunden.");
     }
 
     const { server, resources } = await getStatus();
@@ -218,16 +264,22 @@ async function updateStatus() {
         embeds: [embed]
       });
 
-      console.log("✅ Neue Status-Nachricht erstellt.");
+      console.log("✅ Status-Nachricht erstellt.");
     }
+
   } catch (error) {
     console.error("❌ Fehler beim Aktualisieren des Status:");
-    console.error(error);
+
+    if (error?.message) {
+      console.error(error.message);
+    } else {
+      console.error(error);
+    }
   }
 }
 
 // =========================
-// Slash Command registrieren
+// Slash Command
 // =========================
 
 async function registerCommands() {
@@ -250,11 +302,14 @@ async function registerCommands() {
 }
 
 // =========================
-// Discord Bot gestartet
+// Bot Ready
 // =========================
 
 discord.once("ready", async () => {
-  console.log(`🤖 Bot ist online als ${discord.user.tag}`);
+  console.log("");
+  console.log("=================================");
+  console.log(`🤖 Bot online: ${discord.user.tag}`);
+  console.log("=================================");
 
   try {
     await registerCommands();
@@ -264,12 +319,11 @@ discord.once("ready", async () => {
     console.error(error);
   }
 
-  // Alle 60 Sekunden aktualisieren
   setInterval(updateStatus, 60000);
 });
 
 // =========================
-// /status Command
+// /status
 // =========================
 
 discord.on("interactionCreate", async interaction => {
@@ -291,6 +345,7 @@ discord.on("interactionCreate", async interaction => {
     await interaction.editReply({
       embeds: [embed]
     });
+
   } catch (error) {
     console.error("❌ Fehler bei /status:");
     console.error(error);
@@ -304,7 +359,7 @@ discord.on("interactionCreate", async interaction => {
 });
 
 // =========================
-// Bot Login
+// Discord Login
 // =========================
 
 discord.login(DISCORD_TOKEN);
