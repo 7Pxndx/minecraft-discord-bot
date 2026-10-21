@@ -98,63 +98,148 @@ async function findServer() {
 }
 
 // =========================
+// Server Details über API
+// =========================
+
+async function getServerDetails() {
+  const response = await fetch(
+    `https://respawnhost.com/api/v1/servers/${serverUuid}`,
+    {
+      method: "GET",
+      headers: {
+        "X-Api-Key": RESPAWNHOST_API_KEY
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `RespawnHost Serverdetails Fehler: HTTP ${response.status}`
+    );
+  }
+
+  const result = await response.json();
+
+  return result?.data ?? result;
+}
+
+// =========================
 // Status + Ressourcen
 // =========================
 
 async function getStatus() {
-  const server = await findServer();
+  const basicServer = await findServer();
 
-  let details = null;
+  let details = basicServer;
   let resources = null;
 
-  // Serverdetails abrufen
+  // Serverdetails
   try {
-    details = await servers.get(serverUuid);
+    details = await getServerDetails();
 
-    console.log("========== SERVER DETAILS ==========");
-    console.log(JSON.stringify(details, null, 2));
-    console.log("====================================");
+    console.log("✅ Serverdetails geladen.");
   } catch (error) {
-    console.log("❌ Serverdetails konnten nicht geladen werden.");
-    console.error(error);
+    console.log("⚠️ Serverdetails konnten nicht geladen werden.");
+    console.error(error.message);
   }
 
-  // CPU / RAM abrufen
+  // Ressourcen
   try {
     resources = await servers.getResourceUtilization(serverUuid);
 
-    console.log("========== RESOURCES ===============");
-    console.log(JSON.stringify(resources, null, 2));
-    console.log("====================================");
+    console.log(
+      "========== RESOURCES ==============="
+    );
+
+    console.log(
+      "State:",
+      resources?.current_state ?? "unbekannt"
+    );
+
+    console.log(
+      "CPU:",
+      resources?.resources?.cpu_absolute ?? "unbekannt"
+    );
+
+    console.log(
+      "RAM Bytes:",
+      resources?.resources?.memory_bytes ?? "unbekannt"
+    );
+
+    console.log(
+      "===================================="
+    );
+
   } catch (error) {
     console.log("❌ Ressourcen konnten nicht geladen werden.");
-    console.error(error);
+    console.error(error.message);
   }
 
   return {
-    server: details ?? server,
+    server: details,
     resources
   };
+}
+
+// =========================
+// Wert rekursiv suchen
+// =========================
+
+function findValue(object, possibleKeys) {
+  if (!object || typeof object !== "object") {
+    return null;
+  }
+
+  for (const key of possibleKeys) {
+    if (
+      Object.prototype.hasOwnProperty.call(object, key) &&
+      object[key] !== null &&
+      object[key] !== undefined
+    ) {
+      return object[key];
+    }
+  }
+
+  for (const value of Object.values(object)) {
+    if (value && typeof value === "object") {
+      const result = findValue(value, possibleKeys);
+
+      if (result !== null && result !== undefined) {
+        return result;
+      }
+    }
+  }
+
+  return null;
 }
 
 // =========================
 // ONLINE erkennen
 // =========================
 
-function isServerOnline(server) {
-  const state = String(
+function isServerOnline(resources, server) {
+  const resourceState = String(
+    resources?.current_state ?? ""
+  ).toLowerCase();
+
+  const serverState = String(
     server?.state ??
     server?.status ??
-    server?.powerState ??
     ""
-  ).toUpperCase();
+  ).toLowerCase();
 
-  console.log("🔎 Server State:", state);
+  console.log(
+    "🔎 RespawnHost State:",
+    resourceState || serverState || "unbekannt"
+  );
 
   return (
-    state === "RUNNING" ||
-    state === "ONLINE" ||
-    state === "STARTED"
+    resourceState === "running" ||
+    resourceState === "online" ||
+    resourceState === "started" ||
+    serverState === "running" ||
+    serverState === "online" ||
+    serverState === "started"
   );
 }
 
@@ -163,24 +248,31 @@ function isServerOnline(server) {
 // =========================
 
 function getPlayers(server) {
-  const players =
-    server?.players ??
-    server?.playerCount ??
-    server?.playersOnline ??
-    server?.currentPlayers ??
-    server?.playerCountCurrent;
+  const players = findValue(server, [
+    "players",
+    "playerCount",
+    "playersOnline",
+    "currentPlayers",
+    "onlinePlayers",
+    "player_count",
+    "players_online"
+  ]);
 
   if (typeof players === "number") {
     return players;
   }
 
   if (players && typeof players === "object") {
-    return (
-      players.online ??
-      players.current ??
-      players.count ??
-      null
-    );
+    const number = findValue(players, [
+      "online",
+      "current",
+      "count",
+      "value"
+    ]);
+
+    if (typeof number === "number") {
+      return number;
+    }
   }
 
   return null;
@@ -191,23 +283,17 @@ function getPlayers(server) {
 // =========================
 
 function getMaxPlayers(server) {
-  const maxPlayers =
-    server?.maxPlayers ??
-    server?.playerLimit ??
-    server?.maxPlayerCount ??
-    server?.playersMax;
+  const maxPlayers = findValue(server, [
+    "maxPlayers",
+    "playerLimit",
+    "maxPlayerCount",
+    "playersMax",
+    "max_players",
+    "player_limit"
+  ]);
 
   if (typeof maxPlayers === "number") {
     return maxPlayers;
-  }
-
-  if (maxPlayers && typeof maxPlayers === "object") {
-    return (
-      maxPlayers.max ??
-      maxPlayers.limit ??
-      maxPlayers.count ??
-      null
-    );
   }
 
   return null;
@@ -218,14 +304,10 @@ function getMaxPlayers(server) {
 // =========================
 
 function getCpu(resources) {
-  const cpu =
-    resources?.cpu ??
-    resources?.cpuUsage ??
-    resources?.usage?.cpu ??
-    resources?.data?.cpu;
+  const cpu = resources?.resources?.cpu_absolute;
 
   if (typeof cpu === "number") {
-    return `${cpu}%`;
+    return `${cpu.toFixed(2)}%`;
   }
 
   return "Nicht verfügbar";
@@ -236,15 +318,13 @@ function getCpu(resources) {
 // =========================
 
 function getRam(resources) {
-  const memory =
-    resources?.memory ??
-    resources?.ram ??
-    resources?.memoryUsage ??
-    resources?.usage?.memory ??
-    resources?.data?.memory;
+  const memoryBytes =
+    resources?.resources?.memory_bytes;
 
-  if (typeof memory === "number") {
-    return `${memory} MB`;
+  if (typeof memoryBytes === "number") {
+    const memoryMB = memoryBytes / 1024 / 1024;
+
+    return `${memoryMB.toFixed(0)} MB`;
   }
 
   return "Nicht verfügbar";
@@ -255,15 +335,22 @@ function getRam(resources) {
 // =========================
 
 function createEmbed(server, resources) {
-  const online = isServerOnline(server);
+  const online = isServerOnline(
+    resources,
+    server
+  );
 
   const players = getPlayers(server);
   const maxPlayers = getMaxPlayers(server);
 
-  const playerText =
-    players !== null
-      ? `${players}${maxPlayers !== null ? ` / ${maxPlayers}` : ""}`
-      : "Nicht verfügbar";
+  let playerText = "Nicht verfügbar";
+
+  if (players !== null) {
+    playerText =
+      maxPlayers !== null
+        ? `${players} / ${maxPlayers}`
+        : `${players}`;
+  }
 
   const cpu = getCpu(resources);
   const ram = getRam(resources);
@@ -299,7 +386,7 @@ function createEmbed(server, resources) {
 }
 
 // =========================
-// Discord Status Nachricht
+// Status Nachricht
 // =========================
 
 async function updateStatus() {
@@ -307,46 +394,59 @@ async function updateStatus() {
     const channel = await discord.channels.fetch(CHANNEL_ID);
 
     if (!channel || !channel.isTextBased()) {
-      throw new Error("Discord-Kanal nicht gefunden.");
+      throw new Error(
+        "Discord-Kanal nicht gefunden."
+      );
     }
 
-    const { server, resources } = await getStatus();
+    const {
+      server,
+      resources
+    } = await getStatus();
 
-    const embed = createEmbed(server, resources);
-
-    const messages = await channel.messages.fetch({
-      limit: 10
-    });
-
-    const existingMessage = messages.find(
-      message =>
-        message.author.id === discord.user.id &&
-        message.embeds.length > 0 &&
-        message.embeds[0].title === "🎮 Minecraft Server"
+    const embed = createEmbed(
+      server,
+      resources
     );
+
+    const messages =
+      await channel.messages.fetch({
+        limit: 10
+      });
+
+    const existingMessage =
+      messages.find(
+        message =>
+          message.author.id === discord.user.id &&
+          message.embeds.length > 0 &&
+          message.embeds[0].title ===
+            "🎮 Minecraft Server"
+      );
 
     if (existingMessage) {
       await existingMessage.edit({
         embeds: [embed]
       });
 
-      console.log("✅ Status-Nachricht aktualisiert.");
+      console.log(
+        "✅ Status-Nachricht aktualisiert."
+      );
     } else {
       await channel.send({
         embeds: [embed]
       });
 
-      console.log("✅ Status-Nachricht erstellt.");
+      console.log(
+        "✅ Status-Nachricht erstellt."
+      );
     }
 
   } catch (error) {
-    console.error("❌ Fehler beim Aktualisieren des Status:");
+    console.error(
+      "❌ Fehler beim Aktualisieren des Status:"
+    );
 
-    if (error?.message) {
-      console.error(error.message);
-    } else {
-      console.error(error);
-    }
+    console.error(error);
   }
 }
 
@@ -355,9 +455,12 @@ async function updateStatus() {
 // =========================
 
 async function registerCommands() {
-  const command = new SlashCommandBuilder()
-    .setName("status")
-    .setDescription("Zeigt den aktuellen Minecraft Server Status.");
+  const command =
+    new SlashCommandBuilder()
+      .setName("status")
+      .setDescription(
+        "Zeigt den aktuellen Minecraft Server Status."
+      );
 
   const rest = new REST({
     version: "10"
@@ -370,7 +473,9 @@ async function registerCommands() {
     }
   );
 
-  console.log("✅ /status wurde registriert.");
+  console.log(
+    "✅ /status wurde registriert."
+  );
 }
 
 // =========================
@@ -380,55 +485,80 @@ async function registerCommands() {
 discord.once("ready", async () => {
   console.log("");
   console.log("=================================");
-  console.log(`🤖 Bot online: ${discord.user.tag}`);
+  console.log(
+    `🤖 Bot online: ${discord.user.tag}`
+  );
   console.log("=================================");
 
   try {
     await registerCommands();
     await updateStatus();
   } catch (error) {
-    console.error("❌ Fehler beim Start:");
+    console.error(
+      "❌ Fehler beim Start:"
+    );
+
     console.error(error);
   }
 
-  setInterval(updateStatus, 60000);
+  setInterval(
+    updateStatus,
+    60000
+  );
 });
 
 // =========================
 // /status
 // =========================
 
-discord.on("interactionCreate", async interaction => {
-  if (!interaction.isChatInputCommand()) {
-    return;
-  }
+discord.on(
+  "interactionCreate",
+  async interaction => {
 
-  if (interaction.commandName !== "status") {
-    return;
-  }
+    if (!interaction.isChatInputCommand()) {
+      return;
+    }
 
-  try {
-    await interaction.deferReply();
+    if (interaction.commandName !== "status") {
+      return;
+    }
 
-    const { server, resources } = await getStatus();
+    try {
+      await interaction.deferReply();
 
-    const embed = createEmbed(server, resources);
+      const {
+        server,
+        resources
+      } = await getStatus();
 
-    await interaction.editReply({
-      embeds: [embed]
-    });
+      const embed =
+        createEmbed(
+          server,
+          resources
+        );
 
-  } catch (error) {
-    console.error("❌ Fehler bei /status:");
-    console.error(error);
+      await interaction.editReply({
+        embeds: [embed]
+      });
 
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply(
-        "❌ Der Minecraft Server Status konnte nicht abgerufen werden."
+    } catch (error) {
+      console.error(
+        "❌ Fehler bei /status:"
       );
+
+      console.error(error);
+
+      if (
+        interaction.deferred ||
+        interaction.replied
+      ) {
+        await interaction.editReply(
+          "❌ Der Minecraft Server Status konnte nicht abgerufen werden."
+        );
+      }
     }
   }
-});
+);
 
 // =========================
 // Discord Login
