@@ -1,41 +1,44 @@
-const {
+import {
   Client,
   GatewayIntentBits,
   EmbedBuilder,
   REST,
   Routes,
   SlashCommandBuilder
-} = require("discord.js");
+} from "discord.js";
 
-const {
-  RespawnHostClient,
-  ServersService
-} = require("@respawnhost/sdk");
+import { RespawnHostClient, ServersService } from "@respawnhost/sdk";
+import http from "node:http";
 
-const http = require("http");
+// =========================
+// Render Web Service
+// =========================
 
-// Render Webserver
-const port = process.env.PORT || 10000;
+const port = Number(process.env.PORT || 10000);
 
 const webServer = http.createServer((req, res) => {
   res.writeHead(200, {
-    "Content-Type": "text/plain"
+    "Content-Type": "text/plain; charset=utf-8"
   });
 
   res.end("Minecraft Discord Bot läuft.");
 });
 
 webServer.listen(port, "0.0.0.0", () => {
-  console.log(`🌐 Webserver läuft auf Port ${port}`);
+  console.log(`Webserver läuft auf Port ${port}`);
 });
 
+// =========================
 // Environment Variables
-const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID;
-const CHANNEL_ID = process.env.CHANNEL_ID;
-const RESPAWNHOST_API_KEY = process.env.RESPAWNHOST_API_KEY;
+// =========================
 
-// Prüfen, ob alle Variablen vorhanden sind
+const {
+  DISCORD_TOKEN,
+  CLIENT_ID,
+  CHANNEL_ID,
+  RESPAWNHOST_API_KEY
+} = process.env;
+
 if (
   !DISCORD_TOKEN ||
   !CLIENT_ID ||
@@ -46,64 +49,84 @@ if (
   process.exit(1);
 }
 
-// Discord Client
+// =========================
+// Discord
+// =========================
+
 const discord = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
 
-// RespawnHost Client
-const respawnClient = new RespawnHostClient({
+// =========================
+// RespawnHost
+// =========================
+
+const respawnHost = new RespawnHostClient({
   apiKey: RESPAWNHOST_API_KEY
 });
 
-const servers = new ServersService(respawnClient);
+const servers = new ServersService(respawnHost);
 
 let serverUuid = null;
-let statusMessage = null;
 
-// Slash Commands
-const commands = [
-  new SlashCommandBuilder()
-    .setName("status")
-    .setDescription("Zeigt den Minecraft Server Status")
-].map(command => command.toJSON());
+// =========================
+// Server finden
+// =========================
 
-// Slash Command registrieren
-async function registerCommands() {
-  const rest = new REST({
-    version: "10"
-  }).setToken(DISCORD_TOKEN);
-
-  await rest.put(
-    Routes.applicationCommands(CLIENT_ID),
-    {
-      body: commands
-    }
-  );
-
-  console.log("✅ Slash Command /status registriert");
-}
-
-// RespawnHost Server suchen
 async function findServer() {
   const result = await servers.list();
 
-  if (!result.data || result.data.length === 0) {
-    throw new Error("Keine RespawnHost Server gefunden.");
+  if (!result?.data || result.data.length === 0) {
+    throw new Error("Kein RespawnHost Server gefunden.");
   }
 
-  if (!serverUuid) {
-    serverUuid = result.data[0].panelUuid;
-  }
+  const server = result.data[0];
 
-  return result.data[0];
+  serverUuid = server.panelUuid;
+
+  console.log(`Minecraft Server gefunden: ${server.name}`);
+  console.log(`Server UUID: ${serverUuid}`);
+
+  return server;
 }
 
-// Discord Embed erstellen
+// =========================
+// Server Status
+// =========================
+
+async function getStatus() {
+  const server = await findServer();
+
+  let resources = null;
+
+  try {
+    if (serverUuid) {
+      resources = await servers.getResourceUtilization(serverUuid);
+    }
+  } catch (error) {
+    console.log("⚠️ Ressourcen konnten nicht geladen werden.");
+  }
+
+  return {
+    server,
+    resources
+  };
+}
+
+// =========================
+// Discord Embed
+// =========================
+
 function createEmbed(server, resources) {
-  const running =
-    server.state === "running" ||
-    server.status === "running" ||
+  const state = String(
+    server.state ??
+    server.status ??
+    ""
+  ).toLowerCase();
+
+  const isOnline =
+    state === "running" ||
+    state === "online" ||
     server.online === true;
 
   const players =
@@ -117,15 +140,22 @@ function createEmbed(server, resources) {
     server.playerLimit ??
     "?";
 
-  const cpu = resources?.cpu ?? "?";
-  const memory = resources?.memory ?? "?";
+  const cpu =
+    resources?.cpu != null
+      ? `${resources.cpu}%`
+      : "?";
 
-  const embed = new EmbedBuilder()
+  const memory =
+    resources?.memory != null
+      ? `${resources.memory} MB`
+      : "?";
+
+  return new EmbedBuilder()
     .setTitle("🎮 Minecraft Server")
     .setDescription(
-      running
-        ? "🟢 **Server ist online**"
-        : "🔴 **Server ist offline**"
+      isOnline
+        ? "🟢 **Der Server ist ONLINE**"
+        : "🔴 **Der Server ist OFFLINE**"
     )
     .addFields(
       {
@@ -134,13 +164,13 @@ function createEmbed(server, resources) {
         inline: true
       },
       {
-        name: "🖥️ CPU",
-        value: `${cpu}%`,
+        name: "⚡ CPU",
+        value: cpu,
         inline: true
       },
       {
-        name: "💾 RAM",
-        value: `${memory} MB`,
+        name: "🧠 RAM",
+        value: memory,
         inline: true
       }
     )
@@ -148,151 +178,133 @@ function createEmbed(server, resources) {
       text: "RespawnHost • Automatischer Status"
     })
     .setTimestamp();
-
-  return embed;
 }
 
-// Serverstatus abrufen
-async function getStatus() {
-  const server = await findServer();
+// =========================
+// Status Nachricht aktualisieren
+// =========================
 
-  let resources = {};
-
-  try {
-    resources = await servers.getResourceUtilization(
-      serverUuid
-    );
-  } catch (error) {
-    console.log(
-      "⚠️ Ressourcen konnten nicht geladen werden."
-    );
-  }
-
-  return {
-    server,
-    resources
-  };
-}
-
-// Status-Nachricht aktualisieren
 async function updateStatus() {
   try {
-    const channel = await discord.channels.fetch(
-      CHANNEL_ID
-    );
+    const channel = await discord.channels.fetch(CHANNEL_ID);
 
-    if (!channel) {
-      console.error(
-        "❌ Discord Channel nicht gefunden."
-      );
-      return;
+    if (!channel || !channel.isTextBased()) {
+      throw new Error("Der angegebene Discord-Kanal wurde nicht gefunden.");
     }
 
-    const {
-      server,
-      resources
-    } = await getStatus();
+    const { server, resources } = await getStatus();
 
-    const embed = createEmbed(
-      server,
-      resources
+    const embed = createEmbed(server, resources);
+
+    const messages = await channel.messages.fetch({
+      limit: 10
+    });
+
+    const existingMessage = messages.find(
+      message =>
+        message.author.id === discord.user.id &&
+        message.embeds.length > 0 &&
+        message.embeds[0].title === "🎮 Minecraft Server"
     );
 
-    // Vorhandene Status-Nachricht suchen
-    if (!statusMessage) {
-      const messages = await channel.messages.fetch({
-        limit: 10
-      });
-
-      statusMessage = messages.find(
-        message =>
-          message.author.id === discord.user.id &&
-          message.embeds.length > 0 &&
-          message.embeds[0].title ===
-            "🎮 Minecraft Server"
-      );
-    }
-
-    // Nachricht bearbeiten oder neue erstellen
-    if (statusMessage) {
-      await statusMessage.edit({
+    if (existingMessage) {
+      await existingMessage.edit({
         embeds: [embed]
       });
+
+      console.log("✅ Status-Nachricht aktualisiert.");
     } else {
-      statusMessage = await channel.send({
+      await channel.send({
         embeds: [embed]
       });
+
+      console.log("✅ Neue Status-Nachricht erstellt.");
     }
-
-    console.log("✅ Status aktualisiert");
-
   } catch (error) {
-    console.error(
-      "❌ Status Fehler:",
-      error.message
-    );
+    console.error("❌ Fehler beim Aktualisieren des Status:");
+    console.error(error);
   }
 }
 
-// Bot ist online
-discord.once("ready", async () => {
-  console.log(
-    `🤖 Bot online als ${discord.user.tag}`
+// =========================
+// Slash Command registrieren
+// =========================
+
+async function registerCommands() {
+  const command = new SlashCommandBuilder()
+    .setName("status")
+    .setDescription("Zeigt den aktuellen Minecraft Server Status.");
+
+  const rest = new REST({
+    version: "10"
+  }).setToken(DISCORD_TOKEN);
+
+  await rest.put(
+    Routes.applicationCommands(CLIENT_ID),
+    {
+      body: [command.toJSON()]
+    }
   );
 
-  await registerCommands();
+  console.log("✅ /status wurde registriert.");
+}
 
-  await updateStatus();
+// =========================
+// Discord Bot gestartet
+// =========================
+
+discord.once("ready", async () => {
+  console.log(`🤖 Bot ist online als ${discord.user.tag}`);
+
+  try {
+    await registerCommands();
+    await updateStatus();
+  } catch (error) {
+    console.error("❌ Fehler beim Start:");
+    console.error(error);
+  }
 
   // Alle 60 Sekunden aktualisieren
-  setInterval(
-    updateStatus,
-    60000
-  );
+  setInterval(updateStatus, 60000);
 });
 
-// Slash Command
-discord.on(
-  "interactionCreate",
-  async interaction => {
+// =========================
+// /status Command
+// =========================
 
-    if (!interaction.isChatInputCommand()) {
-      return;
-    }
+discord.on("interactionCreate", async interaction => {
+  if (!interaction.isChatInputCommand()) {
+    return;
+  }
 
-    if (
-      interaction.commandName === "status"
-    ) {
+  if (interaction.commandName !== "status") {
+    return;
+  }
 
-      await interaction.deferReply();
+  try {
+    await interaction.deferReply();
 
-      try {
+    const { server, resources } = await getStatus();
 
-        const {
-          server,
-          resources
-        } = await getStatus();
+    const embed = createEmbed(server, resources);
 
-        const embed = createEmbed(
-          server,
-          resources
-        );
+    await interaction.editReply({
+      embeds: [embed]
+    });
+  } catch (error) {
+    console.error("❌ Fehler bei /status:");
+    console.error(error);
 
-        await interaction.editReply({
-          embeds: [embed]
-        });
-
-      } catch (error) {
-
-        console.error(error);
-
-        await interaction.editReply(
-          "❌ Der Minecraft-Serverstatus konnte nicht geladen werden."
-        );
-      }
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply(
+        "❌ Der Minecraft Server Status konnte nicht abgerufen werden."
+      );
     }
   }
-);
+});
 
-// Discord Bot starten
+// =========================
+// Bot Login
+// =========================
+
 discord.login(DISCORD_TOKEN);
