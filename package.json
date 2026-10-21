@@ -2,12 +2,13 @@
   "name": "minecraft-discord-bot",
   "version": "1.0.0",
   "description": "Minecraft server status Discord bot",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.16.3",
-    "@respawnhost/sdk": "latest"
+    "@respawnhost/sdk": "^1.2.0-beta"
   }
 }
