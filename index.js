@@ -45,7 +45,7 @@ if (!RESPAWNHOST_API_KEY) {
 // RENDER WEB SERVER
 // ======================================================
 
-const server = http.createServer((req, res) => {
+const webServer = http.createServer((req, res) => {
   res.writeHead(200, {
     "Content-Type": "text/plain; charset=utf-8"
   });
@@ -53,7 +53,7 @@ const server = http.createServer((req, res) => {
   res.end("Minecraft Discord Bot läuft.");
 });
 
-server.listen(PORT, () => {
+webServer.listen(PORT, () => {
   console.log(`🌐 Webserver läuft auf Port ${PORT}`);
 });
 
@@ -99,14 +99,17 @@ async function findServer() {
       return null;
     }
 
-    const foundServer = serverList.find((server) => {
-      const name =
-        server?.alias ??
-        server?.name ??
-        "";
+    const foundServer =
+      serverList.find((server) => {
+        const name =
+          server?.alias ??
+          server?.name ??
+          "";
 
-      return name.toLowerCase().includes("blockbande");
-    }) ?? serverList[0];
+        return String(name)
+          .toLowerCase()
+          .includes("blockbande");
+      }) ?? serverList[0];
 
     serverUuid =
       foundServer?.panelUuid ??
@@ -115,6 +118,7 @@ async function findServer() {
       null;
 
     console.log("🎮 RespawnHost Server gefunden");
+
     console.log(
       "Name:",
       foundServer?.alias ??
@@ -122,9 +126,13 @@ async function findServer() {
       "Unbekannt"
     );
 
-    console.log("UUID:", serverUuid);
+    console.log(
+      "UUID:",
+      serverUuid
+    );
 
     return foundServer;
+
   } catch (error) {
     console.error(
       "❌ Fehler beim Suchen des Servers:",
@@ -166,6 +174,7 @@ async function getServerDetails() {
     console.log("✅ Serverdetails geladen.");
 
     return data;
+
   } catch (error) {
     console.error(
       "❌ Fehler beim Laden der Serverdetails:",
@@ -177,18 +186,147 @@ async function getServerDetails() {
 }
 
 // ======================================================
-// STATUS
+// RECURSIVE VALUE FINDER
+// ======================================================
+
+function findValue(object, keys) {
+  if (
+    object === null ||
+    object === undefined ||
+    typeof object !== "object"
+  ) {
+    return null;
+  }
+
+  const wantedKeys =
+    keys.map((key) =>
+      String(key).toLowerCase()
+    );
+
+  for (const [key, value] of Object.entries(object)) {
+    if (
+      wantedKeys.includes(
+        String(key).toLowerCase()
+      )
+    ) {
+      return value;
+    }
+  }
+
+  for (const value of Object.values(object)) {
+    if (
+      value &&
+      typeof value === "object"
+    ) {
+      const found =
+        findValue(
+          value,
+          keys
+        );
+
+      if (found !== null) {
+        return found;
+      }
+    }
+  }
+
+  return null;
+}
+
+// ======================================================
+// STATUS AUS RESPawnhost DATEN ERMITTELN
+// ======================================================
+
+function getServerState(
+  server,
+  details,
+  resources
+) {
+  const combinedData = {
+    server,
+    details,
+    resources
+  };
+
+  const state =
+    findValue(
+      combinedData,
+      [
+        "state",
+        "status",
+        "powerState",
+        "power_state",
+        "serverState",
+        "server_state",
+        "currentState",
+        "current_state",
+        "serverStatus",
+        "server_status"
+      ]
+    );
+
+  console.log(
+    "🔎 RespawnHost State:",
+    state
+  );
+
+  if (
+    state === null ||
+    state === undefined
+  ) {
+    return "";
+  }
+
+  return String(state)
+    .toLowerCase()
+    .trim();
+}
+
+// ======================================================
+// ONLINE STATUS
+// ======================================================
+
+function isServerOnline(
+  server,
+  details,
+  resources
+) {
+  const state =
+    getServerState(
+      server,
+      details,
+      resources
+    );
+
+  const onlineStates = [
+    "running",
+    "online",
+    "started",
+    "active",
+    "start",
+    "on"
+  ];
+
+  return onlineStates.includes(
+    state
+  );
+}
+
+// ======================================================
+// STATUS ABRUFEN
 // ======================================================
 
 async function getStatus() {
   try {
-    const server = await findServer();
+    const server =
+      await findServer();
 
     if (!server) {
       return null;
     }
 
-    const details = await getServerDetails();
+    const details =
+      await getServerDetails();
 
     let resources = null;
 
@@ -204,14 +342,17 @@ async function getStatus() {
       );
     }
 
-    console.log("========== RESOURCES ===============");
+    console.log(
+      "========== RESOURCES ==============="
+    );
 
     console.log(
       "State:",
-      resources?.state ??
-      details?.state ??
-      details?.status ??
-      "unknown"
+      getServerState(
+        server,
+        details,
+        resources
+      )
     );
 
     console.log(
@@ -226,13 +367,16 @@ async function getStatus() {
       "N/A"
     );
 
-    console.log("====================================");
+    console.log(
+      "===================================="
+    );
 
     return {
       server,
       details,
       resources
     };
+
   } catch (error) {
     console.error(
       "❌ Fehler beim Abrufen des Status:",
@@ -244,92 +388,47 @@ async function getStatus() {
 }
 
 // ======================================================
-// RECURSIVE VALUE FINDER
-// ======================================================
-
-function findValue(object, keys) {
-  if (!object || typeof object !== "object") {
-    return null;
-  }
-
-  for (const key of keys) {
-    if (
-      Object.prototype.hasOwnProperty.call(
-        object,
-        key
-      )
-    ) {
-      return object[key];
-    }
-  }
-
-  for (const value of Object.values(object)) {
-    if (
-      value &&
-      typeof value === "object"
-    ) {
-      const found = findValue(
-        value,
-        keys
-      );
-
-      if (found !== null) {
-        return found;
-      }
-    }
-  }
-
-  return null;
-}
-
-// ======================================================
-// ONLINE STATUS
-// ======================================================
-
-function isServerOnline(resources, server) {
-  const state =
-    resources?.state ??
-    resources?.status ??
-    server?.state ??
-    server?.status ??
-    "";
-
-  console.log(
-    "🔎 RespawnHost State:",
-    state
-  );
-
-  const normalized =
-    String(state).toLowerCase();
-
-  return [
-    "running",
-    "online",
-    "started",
-    "active"
-  ].includes(normalized);
-}
-
-// ======================================================
 // PLAYERS
 // ======================================================
 
-function getPlayers(server) {
-  const value = findValue(
+function getPlayers(
+  server,
+  details
+) {
+  const combinedData = {
     server,
-    [
-      "players",
-      "playerCount",
-      "playersOnline",
-      "currentPlayers",
-      "onlinePlayers",
-      "player_count",
-      "players_online"
-    ]
-  );
+    details
+  };
+
+  const value =
+    findValue(
+      combinedData,
+      [
+        "players",
+        "playerCount",
+        "playersOnline",
+        "currentPlayers",
+        "onlinePlayers",
+        "player_count",
+        "players_online",
+        "online"
+      ]
+    );
 
   if (typeof value === "number") {
     return value;
+  }
+
+  if (
+    typeof value === "string" &&
+    value.trim() !== ""
+  ) {
+    const number =
+      Number(value);
+
+    if (!Number.isNaN(number)) {
+      return number;
+    }
   }
 
   if (
@@ -350,6 +449,17 @@ function getPlayers(server) {
     if (typeof nested === "number") {
       return nested;
     }
+
+    if (
+      typeof nested === "string"
+    ) {
+      const number =
+        Number(nested);
+
+      if (!Number.isNaN(number)) {
+        return number;
+      }
+    }
   }
 
   return null;
@@ -359,22 +469,45 @@ function getPlayers(server) {
 // MAX PLAYERS
 // ======================================================
 
-function getMaxPlayers(server) {
-  const value = findValue(
+function getMaxPlayers(
+  server,
+  details
+) {
+  const combinedData = {
     server,
-    [
-      "maxPlayers",
-      "playerLimit",
-      "maxPlayerCount",
-      "playersMax",
-      "max_players",
-      "player_limit"
-    ]
-  );
+    details
+  };
 
-  return typeof value === "number"
-    ? value
-    : null;
+  const value =
+    findValue(
+      combinedData,
+      [
+        "maxPlayers",
+        "playerLimit",
+        "maxPlayerCount",
+        "playersMax",
+        "max_players",
+        "player_limit",
+        "max"
+      ]
+    );
+
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (
+    typeof value === "string"
+  ) {
+    const number =
+      Number(value);
+
+    if (!Number.isNaN(number)) {
+      return number;
+    }
+  }
+
+  return null;
 }
 
 // ======================================================
@@ -425,14 +558,19 @@ function getRam(resources) {
   }
 
   const gb =
-    number / 1024 / 1024 / 1024;
+    number /
+    1024 /
+    1024 /
+    1024;
 
   if (gb >= 1) {
     return `${gb.toFixed(2)} GB`;
   }
 
   const mb =
-    number / 1024 / 1024;
+    number /
+    1024 /
+    1024;
 
   return `${mb.toFixed(0)} MB`;
 }
@@ -441,7 +579,10 @@ function getRam(resources) {
 // PLAYER BAR
 // ======================================================
 
-function getPlayerBar(players, maxPlayers) {
+function getPlayerBar(
+  players,
+  maxPlayers
+) {
   if (
     players === null ||
     maxPlayers === null ||
@@ -460,7 +601,8 @@ function getPlayerBar(players, maxPlayers) {
 
   const filled =
     Math.round(
-      percentage * totalBlocks
+      percentage *
+      totalBlocks
     );
 
   return (
@@ -475,18 +617,29 @@ function getPlayerBar(players, maxPlayers) {
 // PREMIUM EMBED
 // ======================================================
 
-function createEmbed(server, resources) {
+function createEmbed(
+  server,
+  details,
+  resources
+) {
   const online =
     isServerOnline(
-      resources,
-      server
+      server,
+      details,
+      resources
     );
 
   const players =
-    getPlayers(server);
+    getPlayers(
+      server,
+      details
+    );
 
   const maxPlayers =
-    getMaxPlayers(server);
+    getMaxPlayers(
+      server,
+      details
+    );
 
   const playerText =
     players !== null
@@ -534,7 +687,9 @@ function createEmbed(server, resources) {
       name: "BLOCKBANDE NETWORK"
     })
 
-    .setTitle(serverName)
+    .setTitle(
+      serverName
+    )
 
     .setDescription(
       `**● ${statusText}**\n${statusDescription}`
@@ -589,7 +744,7 @@ function createEmbed(server, resources) {
 }
 
 // ======================================================
-// UPDATE STATUS MESSAGE
+// STATUS NACHRICHT AKTUALISIEREN
 // ======================================================
 
 async function updateStatus() {
@@ -620,12 +775,14 @@ async function updateStatus() {
 
     const {
       server,
+      details,
       resources
     } = status;
 
     const embed =
       createEmbed(
         server,
+        details,
         resources
       );
 
@@ -652,6 +809,7 @@ async function updateStatus() {
       console.log(
         "✅ Status-Nachricht aktualisiert."
       );
+
     } else {
       await channel.send({
         embeds: [embed]
@@ -661,6 +819,7 @@ async function updateStatus() {
         "✅ Neue Status-Nachricht gesendet."
       );
     }
+
   } catch (error) {
     console.error(
       "❌ Fehler beim Aktualisieren der Status-Nachricht:",
@@ -694,7 +853,7 @@ const rest =
 // ======================================================
 
 discord.once(
-  "ready",
+  "clientReady",
   async () => {
     console.log(
       `🤖 Bot online: ${discord.user.tag}`
@@ -713,6 +872,7 @@ discord.once(
       console.log(
         "✅ /status wurde registriert."
       );
+
     } catch (error) {
       console.error(
         "❌ Slash Command Fehler:",
@@ -736,6 +896,7 @@ discord.once(
 discord.on(
   "interactionCreate",
   async (interaction) => {
+
     if (
       !interaction.isChatInputCommand()
     ) {
@@ -766,12 +927,14 @@ discord.on(
       const embed =
         createEmbed(
           status.server,
+          status.details,
           status.resources
         );
 
       await interaction.editReply({
         embeds: [embed]
       });
+
     } catch (error) {
       console.error(
         "❌ /status Fehler:",
