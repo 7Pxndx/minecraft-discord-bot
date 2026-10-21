@@ -25,7 +25,7 @@ const webServer = http.createServer((req, res) => {
     "Content-Type": "text/plain; charset=utf-8"
   });
 
-  res.end("Minecraft Discord Bot läuft.");
+  res.end("BlockBanDE Minecraft Status Bot läuft.");
 });
 
 webServer.listen(port, "0.0.0.0", () => {
@@ -98,7 +98,7 @@ async function findServer() {
 }
 
 // =========================
-// Server Details über API
+// Server Details
 // =========================
 
 async function getServerDetails() {
@@ -133,7 +133,6 @@ async function getStatus() {
   let details = basicServer;
   let resources = null;
 
-  // Serverdetails
   try {
     details = await getServerDetails();
 
@@ -143,13 +142,10 @@ async function getStatus() {
     console.error(error.message);
   }
 
-  // Ressourcen
   try {
     resources = await servers.getResourceUtilization(serverUuid);
 
-    console.log(
-      "========== RESOURCES ==============="
-    );
+    console.log("========== RESOURCES ===============");
 
     console.log(
       "State:",
@@ -166,10 +162,7 @@ async function getStatus() {
       resources?.resources?.memory_bytes ?? "unbekannt"
     );
 
-    console.log(
-      "===================================="
-    );
-
+    console.log("====================================");
   } catch (error) {
     console.log("❌ Ressourcen konnten nicht geladen werden.");
     console.error(error.message);
@@ -182,7 +175,7 @@ async function getStatus() {
 }
 
 // =========================
-// Wert rekursiv suchen
+// Rekursiv Werte suchen
 // =========================
 
 function findValue(object, possibleKeys) {
@@ -214,7 +207,7 @@ function findValue(object, possibleKeys) {
 }
 
 // =========================
-// ONLINE erkennen
+// Online Status
 // =========================
 
 function isServerOnline(resources, server) {
@@ -228,11 +221,6 @@ function isServerOnline(resources, server) {
     ""
   ).toLowerCase();
 
-  console.log(
-    "🔎 RespawnHost State:",
-    resourceState || serverState || "unbekannt"
-  );
-
   return (
     resourceState === "running" ||
     resourceState === "online" ||
@@ -244,7 +232,7 @@ function isServerOnline(resources, server) {
 }
 
 // =========================
-// Spielerzahl
+// Spieler
 // =========================
 
 function getPlayers(server) {
@@ -279,7 +267,7 @@ function getPlayers(server) {
 }
 
 // =========================
-// Maximale Spielerzahl
+// Max Spieler
 // =========================
 
 function getMaxPlayers(server) {
@@ -310,7 +298,7 @@ function getCpu(resources) {
     return `${cpu.toFixed(2)}%`;
   }
 
-  return "Nicht verfügbar";
+  return "N/A";
 }
 
 // =========================
@@ -322,12 +310,49 @@ function getRam(resources) {
     resources?.resources?.memory_bytes;
 
   if (typeof memoryBytes === "number") {
-    const memoryMB = memoryBytes / 1024 / 1024;
+    const memoryGB =
+      memoryBytes / 1024 / 1024 / 1024;
+
+    if (memoryGB >= 1) {
+      return `${memoryGB.toFixed(2)} GB`;
+    }
+
+    const memoryMB =
+      memoryBytes / 1024 / 1024;
 
     return `${memoryMB.toFixed(0)} MB`;
   }
 
-  return "Nicht verfügbar";
+  return "N/A";
+}
+
+// =========================
+// Spieler-Auslastung
+// =========================
+
+function getPlayerBar(players, maxPlayers) {
+  if (
+    players === null ||
+    maxPlayers === null ||
+    maxPlayers <= 0
+  ) {
+    return "━━━━━━━━━━━━━━━━";
+  }
+
+  const percentage = Math.min(
+    players / maxPlayers,
+    1
+  );
+
+  const totalBlocks = 16;
+  const filled = Math.round(
+    percentage * totalBlocks
+  );
+
+  return (
+    "▰".repeat(filled) +
+    "▱".repeat(totalBlocks - filled)
+  );
 }
 
 // =========================
@@ -343,45 +368,84 @@ function createEmbed(server, resources) {
   const players = getPlayers(server);
   const maxPlayers = getMaxPlayers(server);
 
-  let playerText = "Nicht verfügbar";
+  const playerText =
+    players !== null
+      ? maxPlayers !== null
+        ? `**${players}** / ${maxPlayers}`
+        : `**${players}**`
+      : "**N/A**";
 
-  if (players !== null) {
-    playerText =
-      maxPlayers !== null
-        ? `${players} / ${maxPlayers}`
-        : `${players}`;
-  }
+  const playerBar = getPlayerBar(
+    players,
+    maxPlayers
+  );
 
   const cpu = getCpu(resources);
   const ram = getRam(resources);
 
+  const serverName =
+    server?.alias ??
+    server?.name ??
+    "BlockBanDE";
+
+  const statusText = online
+    ? "ONLINE"
+    : "OFFLINE";
+
+  const statusDescription = online
+    ? "Server is running normally"
+    : "Server is currently unavailable";
+
   return new EmbedBuilder()
-    .setTitle("🎮 Minecraft Server")
+    .setColor(
+      online ? 0x57f287 : 0xed4245
+    )
+
+    .setAuthor({
+      name: "BLOCKBANDE • SERVER STATUS"
+    })
+
+    .setTitle(`◈ ${serverName}`)
+
     .setDescription(
       online
-        ? "🟢 **Der Server ist ONLINE**"
-        : "🔴 **Der Server ist OFFLINE**"
+        ? `🟢  **${statusText}**\n${statusDescription}`
+        : `🔴  **${statusText}**\n${statusDescription}`
     )
+
     .addFields(
       {
-        name: "👥 Spieler",
-        value: playerText,
+        name: "PLAYERS",
+        value:
+          `${playerText}\n` +
+          `\`${playerBar}\``,
         inline: true
       },
       {
-        name: "⚡ CPU",
-        value: cpu,
+        name: "CPU",
+        value: `**${cpu}**\nProcessor usage`,
         inline: true
       },
       {
-        name: "🧠 RAM",
-        value: ram,
+        name: "MEMORY",
+        value: `**${ram}**\nMemory usage`,
         inline: true
       }
     )
-    .setFooter({
-      text: "RespawnHost • Automatischer Status"
+
+    .addFields({
+      name: "SERVER STATUS",
+      value:
+        online
+          ? "🟢 **Operational**"
+          : "🔴 **Offline**",
+      inline: false
     })
+
+    .setFooter({
+      text: "BLOCKBANDE • Minecraft Network"
+    })
+
     .setTimestamp();
 }
 
@@ -391,7 +455,8 @@ function createEmbed(server, resources) {
 
 async function updateStatus() {
   try {
-    const channel = await discord.channels.fetch(CHANNEL_ID);
+    const channel =
+      await discord.channels.fetch(CHANNEL_ID);
 
     if (!channel || !channel.isTextBased()) {
       throw new Error(
@@ -404,10 +469,11 @@ async function updateStatus() {
       resources
     } = await getStatus();
 
-    const embed = createEmbed(
-      server,
-      resources
-    );
+    const embed =
+      createEmbed(
+        server,
+        resources
+      );
 
     const messages =
       await channel.messages.fetch({
@@ -419,8 +485,8 @@ async function updateStatus() {
         message =>
           message.author.id === discord.user.id &&
           message.embeds.length > 0 &&
-          message.embeds[0].title ===
-            "🎮 Minecraft Server"
+          message.embeds[0].author?.name ===
+            "BLOCKBANDE • SERVER STATUS"
       );
 
     if (existingMessage) {
@@ -440,7 +506,6 @@ async function updateStatus() {
         "✅ Status-Nachricht erstellt."
       );
     }
-
   } catch (error) {
     console.error(
       "❌ Fehler beim Aktualisieren des Status:"
@@ -462,14 +527,21 @@ async function registerCommands() {
         "Zeigt den aktuellen Minecraft Server Status."
       );
 
-  const rest = new REST({
-    version: "10"
-  }).setToken(DISCORD_TOKEN);
+  const rest =
+    new REST({
+      version: "10"
+    }).setToken(
+      DISCORD_TOKEN
+    );
 
   await rest.put(
-    Routes.applicationCommands(CLIENT_ID),
+    Routes.applicationCommands(
+      CLIENT_ID
+    ),
     {
-      body: [command.toJSON()]
+      body: [
+        command.toJSON()
+      ]
     }
   );
 
@@ -514,12 +586,13 @@ discord.once("ready", async () => {
 discord.on(
   "interactionCreate",
   async interaction => {
-
     if (!interaction.isChatInputCommand()) {
       return;
     }
 
-    if (interaction.commandName !== "status") {
+    if (
+      interaction.commandName !== "status"
+    ) {
       return;
     }
 
@@ -540,7 +613,6 @@ discord.on(
       await interaction.editReply({
         embeds: [embed]
       });
-
     } catch (error) {
       console.error(
         "❌ Fehler bei /status:"
@@ -564,4 +636,6 @@ discord.on(
 // Discord Login
 // =========================
 
-discord.login(DISCORD_TOKEN);
+discord.login(
+  DISCORD_TOKEN
+);
