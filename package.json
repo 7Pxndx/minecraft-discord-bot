@@ -9,6 +9,6 @@
   },
   "dependencies": {
     "discord.js": "^14.16.3",
-    "@respawnhost/sdk": "^1.2.0-beta"
+    "@respawnhost/sdk": "1.2.0-BETA"
   }
 }
