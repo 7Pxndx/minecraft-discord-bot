@@ -1,6 +1,3 @@
-// BLOCKBANDE NETWORK - Discord / Minecraft Server Monitor
-// Fresh deployment version - do not wrap this file in Markdown fences.
-
 import {
   Client,
   GatewayIntentBits,
