@@ -31,13 +31,10 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 const RESPAWNHOST_API_KEY = process.env.RESPAWNHOST_API_KEY;
 
-// Feste Serverdaten
 const SERVER_IP = "5.175.214.105:25581";
-
 const NETWORK_NAME = "BLOCKBANDE NETWORK";
 const SERVER_FALLBACK_NAME = "BlockBanDE";
 
-// Update alle 60 Sekunden
 const UPDATE_INTERVAL = 60 * 1000;
 
 // ======================================================
@@ -73,7 +70,7 @@ const webServer = http.createServer((req, res) => {
 });
 
 webServer.listen(PORT, () => {
-  console.log(`🌐 Webserver läuft auf Port ${PORT}`);
+  console.log("Webserver läuft auf Port " + PORT);
 });
 
 // ======================================================
@@ -87,60 +84,54 @@ const discord = new Client({
 });
 
 // ======================================================
-// DISCORD ERROR / CONNECTION HANDLERS
+// DISCORD DEBUG / ERROR HANDLER
 // ======================================================
 
+discord.on("ready", () => {
+  console.log("Bot online: " + discord.user.tag);
+});
+
 discord.on("error", (error) => {
-  console.error("❌ Discord Client Fehler:", error);
+  console.error("Discord Client Error:", error);
 });
 
 discord.on("shardError", (error) => {
-  console.error("❌ Discord Gateway Fehler:", error);
+  console.error("Discord Shard Error:", error);
 });
 
 discord.on("warn", (message) => {
-  console.warn("⚠️ Discord Warnung:", message);
+  console.warn("Discord Warnung:", message);
 });
 
 discord.on("debug", (message) => {
-  console.log("🔧 Discord Debug:", message);
+  console.log("Discord Debug:", message);
 });
 
 discord.on("shardDisconnect", (event, shardId) => {
-  console.error(
-    `🔴 Discord Gateway getrennt! Shard: ${shardId}`,
-    event
+  console.warn(
+    "Discord Shard getrennt. Shard:",
+    shardId,
+    "Code:",
+    event?.code
   );
 });
 
 discord.on("shardReconnecting", (shardId) => {
   console.log(
-    `🟡 Discord verbindet sich erneut... Shard: ${shardId}`
+    "Discord versucht Verbindung wiederherzustellen. Shard:",
+    shardId
   );
 });
 
 discord.on("shardReady", (shardId) => {
   console.log(
-    `🟢 Discord Gateway wieder verbunden! Shard: ${shardId}`
+    "Discord Shard wieder verbunden. Shard:",
+    shardId
   );
 });
 
 discord.on("invalidated", () => {
-  console.error(
-    "🔴 Discord Session wurde invalidiert. Bot muss neu gestartet werden."
-  );
-});
-
-// ======================================================
-// NODE ERROR HANDLERS
-// ======================================================
-
-process.on("unhandledRejection", (error) => {
-  console.error("❌ Unhandled Promise Rejection:", error);
-});
-
-process.on("uncaughtException", (error) => {
-  console.error("❌ Uncaught Exception:", error);
+  console.error("Discord Session wurde invalidiert.");
 });
 
 // ======================================================
@@ -163,15 +154,14 @@ async function findServer() {
   try {
     const result = await servers.list();
 
-    const serverList =
-      Array.isArray(result)
-        ? result
-        : result?.data ??
-          result?.servers ??
-          [];
+    const serverList = Array.isArray(result)
+      ? result
+      : result?.data ??
+        result?.servers ??
+        [];
 
     if (!serverList.length) {
-      console.log("❌ Kein RespawnHost Server gefunden.");
+      console.log("Kein RespawnHost Server gefunden.");
       return null;
     }
 
@@ -194,7 +184,7 @@ async function findServer() {
       foundServer?.id ??
       null;
 
-    console.log("🎮 RespawnHost Server gefunden");
+    console.log("RespawnHost Server gefunden.");
 
     console.log(
       "Name:",
@@ -206,10 +196,9 @@ async function findServer() {
     console.log("UUID:", serverUuid);
 
     return foundServer;
-
   } catch (error) {
     console.error(
-      "❌ Fehler beim Suchen des Servers:",
+      "Fehler beim Suchen des Servers:",
       error
     );
 
@@ -228,7 +217,7 @@ async function getServerDetails() {
 
   try {
     const response = await fetch(
-      `https://respawnhost.com/api/v1/servers/${serverUuid}`,
+      "https://respawnhost.com/api/v1/servers/" + serverUuid,
       {
         headers: {
           "X-Api-Key": RESPAWNHOST_API_KEY,
@@ -238,18 +227,19 @@ async function getServerDetails() {
     );
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      throw new Error(
+        "HTTP " + response.status
+      );
     }
 
     const data = await response.json();
 
-    console.log("✅ Serverdetails geladen.");
+    console.log("Serverdetails geladen.");
 
     return data;
-
   } catch (error) {
     console.error(
-      "❌ Fehler beim Laden der Serverdetails:",
+      "Fehler beim Laden der Serverdetails:",
       error
     );
 
@@ -335,7 +325,7 @@ function getServerState(
   );
 
   console.log(
-    "🔎 RespawnHost State:",
+    "RespawnHost State:",
     state
   );
 
@@ -400,16 +390,15 @@ async function getStatus() {
         await servers.getResourceUtilization(
           serverUuid
         );
-
     } catch (error) {
       console.error(
-        "⚠️ Ressourcen konnten nicht geladen werden:",
+        "Ressourcen konnten nicht geladen werden:",
         error
       );
     }
 
     console.log(
-      "========== RESOURCES ==============="
+      "========== RESOURCES ============"
     );
 
     console.log(
@@ -425,18 +414,18 @@ async function getStatus() {
       "CPU:",
       resources?.resources
         ?.cpu_absolute ??
-        "N/A"
+      "N/A"
     );
 
     console.log(
       "RAM Bytes:",
       resources?.resources
         ?.memory_bytes ??
-        "N/A"
+      "N/A"
     );
 
     console.log(
-      "===================================="
+      "================================="
     );
 
     return {
@@ -444,10 +433,9 @@ async function getStatus() {
       details,
       resources
     };
-
   } catch (error) {
     console.error(
-      "❌ Fehler beim Abrufen des Status:",
+      "Fehler beim Abrufen des Status:",
       error
     );
 
@@ -588,7 +576,7 @@ function getCpu(resources) {
     return "N/A";
   }
 
-  return `${number.toFixed(2)}%`;
+  return number.toFixed(2) + "%";
 }
 
 // ======================================================
@@ -620,7 +608,7 @@ function getRam(resources) {
     1024;
 
   if (gb >= 1) {
-    return `${gb.toFixed(2)} GB`;
+    return gb.toFixed(2) + " GB";
   }
 
   const mb =
@@ -628,7 +616,7 @@ function getRam(resources) {
     1024 /
     1024;
 
-  return `${mb.toFixed(0)} MB`;
+  return mb.toFixed(0) + " MB";
 }
 
 // ======================================================
@@ -644,7 +632,7 @@ function getPlayerBar(
     maxPlayers === null ||
     maxPlayers <= 0
   ) {
-    return "▱▱▱▱▱▱▱▱▱▱";
+    return "..........";
   }
 
   const totalBlocks = 10;
@@ -655,19 +643,20 @@ function getPlayerBar(
   );
 
   const filled = Math.round(
-    percentage * totalBlocks
+    percentage *
+    totalBlocks
   );
 
   return (
-    "▰".repeat(filled) +
-    "▱".repeat(
+    "#".repeat(filled) +
+    "-".repeat(
       totalBlocks - filled
     )
   );
 }
 
 // ======================================================
-// UPTIME TEXT
+// STATUS TEXT
 // ======================================================
 
 function getStatusText(online) {
@@ -689,7 +678,7 @@ function getStatusText(online) {
 }
 
 // ======================================================
-// PREMIUM EMBED
+// DISCORD EMBED
 // ======================================================
 
 function createEmbed(
@@ -716,12 +705,19 @@ function createEmbed(
       details
     );
 
-  const playerText =
-    players !== null
-      ? maxPlayers !== null
-        ? `**${players} / ${maxPlayers}**`
-        : `**${players}**`
-      : "**N/A**";
+  let playerText = "N/A";
+
+  if (players !== null) {
+    if (maxPlayers !== null) {
+      playerText =
+        players +
+        " / " +
+        maxPlayers;
+    } else {
+      playerText =
+        String(players);
+    }
+  }
 
   const playerBar =
     getPlayerBar(
@@ -754,134 +750,88 @@ function createEmbed(
 
   if (online) {
     systemText =
-      "🟢 **Operational**";
+      "ONLINE";
   } else if (
     state === "starting" ||
     state === "start"
   ) {
     systemText =
-      "🟡 **Starting**";
+      "STARTING";
   } else {
     systemText =
-      "🔴 **Offline**";
+      "OFFLINE";
   }
 
   return new EmbedBuilder()
-
     .setColor(status.color)
-
     .setAuthor({
       name:
-        `${NETWORK_NAME} • SERVER MONITOR`
+        NETWORK_NAME +
+        " - SERVER MONITOR"
     })
-
     .setTitle(
-      `⛏️ ${serverName}`
+      "Minecraft Server: " +
+      serverName
     )
-
     .setDescription(
-      online
-        ? `🟢 **ONLINE**\n${status.description}`
-        : `🔴 **OFFLINE**\n${status.description}`
+      systemText +
+      "\n" +
+      status.description
     )
-
-    .addFields({
-      name:
-        "🌐 SERVER ADDRESS",
-
-      value:
-        `\`${SERVER_IP}\``,
-
-      inline: false
-    })
-
     .addFields(
       {
-        name:
-          "👥 PLAYERS",
-
+        name: "SERVER ADDRESS",
         value:
-          `${playerText}\n` +
-          `\`${playerBar}\``,
-
+          SERVER_IP,
+        inline: false
+      },
+      {
+        name: "PLAYERS",
+        value:
+          playerText +
+          "\n[" +
+          playerBar +
+          "]",
         inline: true
       },
-
       {
-        name:
-          "⚡ CPU LOAD",
-
+        name: "CPU LOAD",
         value:
-          `**${cpu}**\n` +
-          "Processor usage",
-
+          cpu,
         inline: true
       },
-
       {
-        name:
-          "🧠 MEMORY",
-
+        name: "MEMORY",
         value:
-          `**${ram}**\n` +
-          "Memory usage",
-
+          ram,
+        inline: true
+      },
+      {
+        name: "RESPAWNHOST STATE",
+        value:
+          state || "unknown",
         inline: true
       }
     )
-
-    .addFields({
-      name:
-        "📡 SYSTEM STATUS",
-
-      value:
-        `${systemText}\n` +
-        `\`${state || "unknown"}\``,
-
-      inline: false
-    })
-
-    .addFields({
-      name:
-        "🛡️ NETWORK",
-
-      value:
-        "BlockBanDE Minecraft Network",
-
-      inline: true
-    })
-
-    .addFields({
-      name:
-        "🔄 UPDATE",
-
-      value:
-        "Automatic • 60 seconds",
-
-      inline: true
-    })
-
     .setFooter({
       text:
-        `${NETWORK_NAME} • LIVE SERVER MONITOR`
+        NETWORK_NAME +
+        " | Automatic Server Monitor"
     })
-
     .setTimestamp();
 }
 
 // ======================================================
-// STATUS NACHRICHT AKTUALISIEREN
+// DISCORD STATUS MESSAGE
 // ======================================================
+
+let statusMessageId = null;
 
 async function updateStatus() {
   try {
-    if (!discord.isReady()) {
-      console.warn(
-        "⚠️ Discord ist nicht verbunden. Status-Update übersprungen."
-      );
-
-      return;
-    }
+    console.log(
+      "Starte Status-Update..."
+    );
 
     const channel =
       await discord.channels.fetch(
@@ -890,9 +840,8 @@ async function updateStatus() {
 
     if (!channel) {
       console.error(
-        "❌ Discord Channel nicht gefunden."
+        "Discord Channel nicht gefunden."
       );
-
       return;
     }
 
@@ -901,66 +850,74 @@ async function updateStatus() {
 
     if (!status) {
       console.error(
-        "❌ Kein Serverstatus verfügbar."
+        "Kein Serverstatus verfügbar."
       );
-
       return;
     }
 
-    const {
-      server,
-      details,
-      resources
-    } = status;
-
     const embed =
       createEmbed(
-        server,
-        details,
-        resources
+        status.server,
+        status.details,
+        status.resources
       );
 
-    const messages =
-      await channel.messages.fetch({
-        limit: 20
-      });
+    let message = null;
 
-    const existingMessage =
-      messages.find(
-        (message) =>
-          message.author?.id ===
-            discord.user.id &&
-          message.embeds?.[0]
-            ?.author?.name ===
-            `${NETWORK_NAME} • SERVER MONITOR`
-      );
-
-    if (existingMessage) {
-      await existingMessage.edit({
-        embeds: [
-          embed
-        ]
-      });
-
-      console.log(
-        "✅ Status-Nachricht aktualisiert."
-      );
-
-    } else {
-      await channel.send({
-        embeds: [
-          embed
-        ]
-      });
-
-      console.log(
-        "✅ Neue Status-Nachricht gesendet."
-      );
+    if (statusMessageId) {
+      try {
+        message =
+          await channel.messages.fetch(
+            statusMessageId
+          );
+      } catch (error) {
+        console.log(
+          "Alte Statusnachricht nicht gefunden."
+        );
+      }
     }
 
+    if (!message) {
+      const messages =
+        await channel.messages.fetch({
+          limit: 20
+        });
+
+      message =
+        messages.find(
+          (msg) =>
+            msg.author.id ===
+            discord.user.id
+        );
+    }
+
+    if (message) {
+      await message.edit({
+        embeds: [embed]
+      });
+
+      statusMessageId =
+        message.id;
+
+      console.log(
+        "Statusnachricht aktualisiert."
+      );
+    } else {
+      const newMessage =
+        await channel.send({
+          embeds: [embed]
+        });
+
+      statusMessageId =
+        newMessage.id;
+
+      console.log(
+        "Neue Statusnachricht erstellt."
+      );
+    }
   } catch (error) {
     console.error(
-      "❌ Fehler beim Aktualisieren der Status-Nachricht:",
+      "Fehler beim Status-Update:",
       error
     );
   }
@@ -970,21 +927,120 @@ async function updateStatus() {
 // SLASH COMMAND
 // ======================================================
 
-const commands = [
+const statusCommand =
   new SlashCommandBuilder()
     .setName("status")
     .setDescription(
       "Zeigt den aktuellen Minecraft Server Status."
-    )
-    .toJSON()
-];
+    );
 
-const rest =
-  new REST({
-    version: "10"
-  }).setToken(
-    DISCORD_TOKEN
-  );
+// ======================================================
+// COMMAND REGISTRIEREN
+// ======================================================
+
+async function registerCommands() {
+  try {
+    const rest =
+      new REST({
+        version: "10"
+      }).setToken(
+        DISCORD_TOKEN
+      );
+
+    await rest.put(
+      Routes.applicationCommands(
+        CLIENT_ID
+      ),
+      {
+        body: [
+          statusCommand.toJSON()
+        ]
+      }
+    );
+
+    console.log(
+      "Slash Command /status registriert."
+    );
+  } catch (error) {
+    console.error(
+      "Fehler beim Registrieren der Slash Commands:",
+      error
+    );
+  }
+}
+
+// ======================================================
+// INTERACTION
+// ======================================================
+
+discord.on(
+  "interactionCreate",
+  async (interaction) => {
+    try {
+      if (
+        !interaction.isChatInputCommand()
+      ) {
+        return;
+      }
+
+      if (
+        interaction.commandName ===
+        "status"
+      ) {
+        await interaction.deferReply();
+
+        const status =
+          await getStatus();
+
+        if (!status) {
+          await interaction.editReply(
+            "Der Serverstatus konnte nicht abgerufen werden."
+          );
+
+          return;
+        }
+
+        const embed =
+          createEmbed(
+            status.server,
+            status.details,
+            status.resources
+          );
+
+        await interaction.editReply({
+          embeds: [embed]
+        });
+      }
+    } catch (error) {
+      console.error(
+        "Fehler bei Interaction:",
+        error
+      );
+
+      try {
+        if (
+          interaction.deferred ||
+          interaction.replied
+        ) {
+          await interaction.editReply(
+            "Beim Ausführen des Befehls ist ein Fehler aufgetreten."
+          );
+        } else {
+          await interaction.reply({
+            content:
+              "Beim Ausführen des Befehls ist ein Fehler aufgetreten.",
+            ephemeral: true
+          });
+        }
+      } catch (replyError) {
+        console.error(
+          "Fehler beim Senden der Fehlerantwort:",
+          replyError
+        );
+      }
+    }
+  }
+);
 
 // ======================================================
 // BOT READY
@@ -994,131 +1050,73 @@ discord.once(
   "clientReady",
   async () => {
     console.log(
-      `🤖 Bot online: ${discord.user.tag}`
+      "Discord Bot ist vollständig verbunden."
     );
 
-    try {
-      await rest.put(
-        Routes.applicationCommands(
-          CLIENT_ID
-        ),
-        {
-          body: commands
-        }
-      );
+    console.log(
+      "Bot:",
+      discord.user.tag
+    );
 
-      console.log(
-        "✅ /status wurde registriert."
-      );
+    console.log(
+      "Bot ID:",
+      discord.user.id
+    );
 
-    } catch (error) {
-      console.error(
-        "❌ Slash Command Fehler:",
-        error
-      );
-    }
+    await registerCommands();
 
-    // Erste Statusmeldung
     await updateStatus();
 
-    // Danach jede Minute
     setInterval(
-      async () => {
-        if (discord.isReady()) {
-          await updateStatus();
-        } else {
-          console.warn(
-            "⚠️ Bot noch nicht wieder verbunden."
-          );
-        }
-      },
+      updateStatus,
       UPDATE_INTERVAL
     );
   }
 );
 
 // ======================================================
-// INTERACTIONS
+// PROCESS ERROR HANDLER
 // ======================================================
 
-discord.on(
-  "interactionCreate",
-  async (interaction) => {
+process.on(
+  "unhandledRejection",
+  (error) => {
+    console.error(
+      "Unhandled Promise Rejection:",
+      error
+    );
+  }
+);
 
-    if (
-      !interaction.isChatInputCommand()
-    ) {
-      return;
-    }
-
-    if (
-      interaction.commandName !==
-      "status"
-    ) {
-      return;
-    }
-
-    try {
-      await interaction.deferReply();
-
-      const status =
-        await getStatus();
-
-      if (!status) {
-        await interaction.editReply(
-          "❌ Der Serverstatus konnte nicht geladen werden."
-        );
-
-        return;
-      }
-
-      const embed =
-        createEmbed(
-          status.server,
-          status.details,
-          status.resources
-        );
-
-      await interaction.editReply({
-        embeds: [
-          embed
-        ]
-      });
-
-    } catch (error) {
-      console.error(
-        "❌ /status Fehler:",
-        error
-      );
-
-      if (
-        interaction.deferred ||
-        interaction.replied
-      ) {
-        await interaction.editReply(
-          "❌ Beim Abrufen des Serverstatus ist ein Fehler aufgetreten."
-        );
-      }
-    }
+process.on(
+  "uncaughtException",
+  (error) => {
+    console.error(
+      "Uncaught Exception:",
+      error
+    );
   }
 );
 
 // ======================================================
-// LOGIN
+// BOT LOGIN
 // ======================================================
 
 console.log(
-  "🔐 Versuche, mit Discord zu verbinden..."
+  "Starte Discord Bot..."
 );
 
-discord.login(
-  DISCORD_TOKEN
-).catch((error) => {
-  console.error(
-    "❌ Discord Login fehlgeschlagen:",
-    error
-  );
-
-  process.exit(1);
-});
+discord
+  .login(DISCORD_TOKEN)
+  .then(() => {
+    console.log(
+      "Discord Login erfolgreich."
+    );
+  })
+  .catch((error) => {
+    console.error(
+      "Discord Login fehlgeschlagen:",
+      error
+    );
+  });
 ```
