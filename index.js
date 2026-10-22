@@ -1,4 +1,3 @@
-```js
 import {
   Client,
   GatewayIntentBits,
@@ -15,15 +14,6 @@ import {
 
 import http from "node:http";
 
-// ======================================================
-// BLOCKBANDE NETWORK
-// Minecraft Discord Server Status Bot
-// ======================================================
-
-// ======================================================
-// CONFIG
-// ======================================================
-
 const PORT = process.env.PORT || 10000;
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
@@ -36,10 +26,6 @@ const NETWORK_NAME = "BLOCKBANDE NETWORK";
 const SERVER_FALLBACK_NAME = "BlockBanDE";
 
 const UPDATE_INTERVAL = 60 * 1000;
-
-// ======================================================
-// ENVIRONMENT CHECK
-// ======================================================
 
 if (!DISCORD_TOKEN) {
   throw new Error("DISCORD_TOKEN fehlt.");
@@ -57,11 +43,9 @@ if (!RESPAWNHOST_API_KEY) {
   throw new Error("RESPAWNHOST_API_KEY fehlt.");
 }
 
-// ======================================================
 // RENDER WEB SERVER
-// ======================================================
 
-const webServer = http.createServer((req, res) => {
+const webServer = http.createServer(function (req, res) {
   res.writeHead(200, {
     "Content-Type": "text/plain; charset=utf-8"
   });
@@ -69,13 +53,11 @@ const webServer = http.createServer((req, res) => {
   res.end("BLOCKBANDE NETWORK Bot läuft.");
 });
 
-webServer.listen(PORT, () => {
+webServer.listen(PORT, function () {
   console.log("Webserver läuft auf Port " + PORT);
 });
 
-// ======================================================
 // DISCORD CLIENT
-// ======================================================
 
 const discord = new Client({
   intents: [
@@ -83,60 +65,52 @@ const discord = new Client({
   ]
 });
 
-// ======================================================
-// DISCORD DEBUG / ERROR HANDLER
-// ======================================================
+// DISCORD FEHLER
 
-discord.on("ready", () => {
-  console.log("Bot online: " + discord.user.tag);
-});
-
-discord.on("error", (error) => {
+discord.on("error", function (error) {
   console.error("Discord Client Error:", error);
 });
 
-discord.on("shardError", (error) => {
+discord.on("shardError", function (error) {
   console.error("Discord Shard Error:", error);
 });
 
-discord.on("warn", (message) => {
+discord.on("warn", function (message) {
   console.warn("Discord Warnung:", message);
 });
 
-discord.on("debug", (message) => {
+discord.on("debug", function (message) {
   console.log("Discord Debug:", message);
 });
 
-discord.on("shardDisconnect", (event, shardId) => {
+discord.on("shardDisconnect", function (event, shardId) {
   console.warn(
     "Discord Shard getrennt. Shard:",
     shardId,
     "Code:",
-    event?.code
+    event && event.code
   );
 });
 
-discord.on("shardReconnecting", (shardId) => {
+discord.on("shardReconnecting", function (shardId) {
   console.log(
     "Discord versucht Verbindung wiederherzustellen. Shard:",
     shardId
   );
 });
 
-discord.on("shardReady", (shardId) => {
+discord.on("shardReady", function (shardId) {
   console.log(
     "Discord Shard wieder verbunden. Shard:",
     shardId
   );
 });
 
-discord.on("invalidated", () => {
+discord.on("invalidated", function () {
   console.error("Discord Session wurde invalidiert.");
 });
 
-// ======================================================
 // RESPAWNHOST
-// ======================================================
 
 const respawnHost = new RespawnHostClient({
   apiKey: RESPAWNHOST_API_KEY
@@ -146,9 +120,7 @@ const servers = new ServersService(respawnHost);
 
 let serverUuid = null;
 
-// ======================================================
 // SERVER SUCHEN
-// ======================================================
 
 async function findServer() {
   try {
@@ -156,9 +128,11 @@ async function findServer() {
 
     const serverList = Array.isArray(result)
       ? result
-      : result?.data ??
-        result?.servers ??
-        [];
+      : result && (
+          result.data ||
+          result.servers ||
+          []
+        );
 
     if (!serverList.length) {
       console.log("Kein RespawnHost Server gefunden.");
@@ -166,36 +140,42 @@ async function findServer() {
     }
 
     const foundServer =
-      serverList.find((server) => {
+      serverList.find(function (server) {
         const name =
-          server?.alias ??
-          server?.name ??
-          "";
+          server && (
+            server.alias ||
+            server.name ||
+            ""
+          );
 
         return String(name)
           .toLowerCase()
           .includes("blockbande");
-      }) ??
-      serverList[0];
+      }) || serverList[0];
 
     serverUuid =
-      foundServer?.panelUuid ??
-      foundServer?.uuid ??
-      foundServer?.id ??
-      null;
+      foundServer && (
+        foundServer.panelUuid ||
+        foundServer.uuid ||
+        foundServer.id ||
+        null
+      );
 
     console.log("RespawnHost Server gefunden.");
 
     console.log(
       "Name:",
-      foundServer?.alias ??
-      foundServer?.name ??
-      SERVER_FALLBACK_NAME
+      foundServer && (
+        foundServer.alias ||
+        foundServer.name ||
+        SERVER_FALLBACK_NAME
+      )
     );
 
     console.log("UUID:", serverUuid);
 
     return foundServer;
+
   } catch (error) {
     console.error(
       "Fehler beim Suchen des Servers:",
@@ -206,9 +186,7 @@ async function findServer() {
   }
 }
 
-// ======================================================
 // SERVER DETAILS
-// ======================================================
 
 async function getServerDetails() {
   if (!serverUuid) {
@@ -237,6 +215,7 @@ async function getServerDetails() {
     console.log("Serverdetails geladen.");
 
     return data;
+
   } catch (error) {
     console.error(
       "Fehler beim Laden der Serverdetails:",
@@ -247,9 +226,7 @@ async function getServerDetails() {
   }
 }
 
-// ======================================================
 // RECURSIVE VALUE FINDER
-// ======================================================
 
 function findValue(object, keys) {
   if (
@@ -260,11 +237,14 @@ function findValue(object, keys) {
     return null;
   }
 
-  const wantedKeys = keys.map((key) =>
-    String(key).toLowerCase()
-  );
+  const wantedKeys = keys.map(function (key) {
+    return String(key).toLowerCase();
+  });
 
-  for (const [key, value] of Object.entries(object)) {
+  for (const entry of Object.entries(object)) {
+    const key = entry[0];
+    const value = entry[1];
+
     if (
       wantedKeys.includes(
         String(key).toLowerCase()
@@ -293,9 +273,7 @@ function findValue(object, keys) {
   return null;
 }
 
-// ======================================================
 // SERVER STATE
-// ======================================================
 
 function getServerState(
   server,
@@ -303,9 +281,9 @@ function getServerState(
   resources
 ) {
   const combinedData = {
-    server,
-    details,
-    resources
+    server: server,
+    details: details,
+    resources: resources
   };
 
   const state = findValue(
@@ -341,9 +319,7 @@ function getServerState(
     .trim();
 }
 
-// ======================================================
 // ONLINE STATUS
-// ======================================================
 
 function isServerOnline(
   server,
@@ -368,9 +344,7 @@ function isServerOnline(
   return onlineStates.includes(state);
 }
 
-// ======================================================
-// STATUS ABRUFEN
-// ======================================================
+// STATUS
 
 async function getStatus() {
   try {
@@ -398,7 +372,7 @@ async function getStatus() {
     }
 
     console.log(
-      "========== RESOURCES ============"
+      "========== SERVER STATUS =========="
     );
 
     console.log(
@@ -412,27 +386,32 @@ async function getStatus() {
 
     console.log(
       "CPU:",
-      resources?.resources
-        ?.cpu_absolute ??
-      "N/A"
+      resources &&
+      resources.resources &&
+      resources.resources.cpu_absolute !== undefined
+        ? resources.resources.cpu_absolute
+        : "N/A"
     );
 
     console.log(
       "RAM Bytes:",
-      resources?.resources
-        ?.memory_bytes ??
-      "N/A"
+      resources &&
+      resources.resources &&
+      resources.resources.memory_bytes !== undefined
+        ? resources.resources.memory_bytes
+        : "N/A"
     );
 
     console.log(
-      "================================="
+      "===================================="
     );
 
     return {
-      server,
-      details,
-      resources
+      server: server,
+      details: details,
+      resources: resources
     };
+
   } catch (error) {
     console.error(
       "Fehler beim Abrufen des Status:",
@@ -443,17 +422,15 @@ async function getStatus() {
   }
 }
 
-// ======================================================
 // PLAYERS
-// ======================================================
 
 function getPlayers(
   server,
   details
 ) {
   const combinedData = {
-    server,
-    details
+    server: server,
+    details: details
   };
 
   const value = findValue(
@@ -514,17 +491,15 @@ function getPlayers(
   return null;
 }
 
-// ======================================================
 // MAX PLAYERS
-// ======================================================
 
 function getMaxPlayers(
   server,
   details
 ) {
   const combinedData = {
-    server,
-    details
+    server: server,
+    details: details
   };
 
   const value = findValue(
@@ -554,14 +529,13 @@ function getMaxPlayers(
   return null;
 }
 
-// ======================================================
 // CPU
-// ======================================================
 
 function getCpu(resources) {
   const cpu =
-    resources?.resources
-      ?.cpu_absolute;
+    resources &&
+    resources.resources &&
+    resources.resources.cpu_absolute;
 
   if (
     cpu === null ||
@@ -579,14 +553,13 @@ function getCpu(resources) {
   return number.toFixed(2) + "%";
 }
 
-// ======================================================
 // RAM
-// ======================================================
 
 function getRam(resources) {
   const bytes =
-    resources?.resources
-      ?.memory_bytes;
+    resources &&
+    resources.resources &&
+    resources.resources.memory_bytes;
 
   if (
     bytes === null ||
@@ -619,9 +592,7 @@ function getRam(resources) {
   return mb.toFixed(0) + " MB";
 }
 
-// ======================================================
 // PLAYER BAR
-// ======================================================
 
 function getPlayerBar(
   players,
@@ -632,7 +603,7 @@ function getPlayerBar(
     maxPlayers === null ||
     maxPlayers <= 0
   ) {
-    return "..........";
+    return "----------";
   }
 
   const totalBlocks = 10;
@@ -643,8 +614,7 @@ function getPlayerBar(
   );
 
   const filled = Math.round(
-    percentage *
-    totalBlocks
+    percentage * totalBlocks
   );
 
   return (
@@ -655,9 +625,7 @@ function getPlayerBar(
   );
 }
 
-// ======================================================
 // STATUS TEXT
-// ======================================================
 
 function getStatusText(online) {
   if (online) {
@@ -677,9 +645,7 @@ function getStatusText(online) {
   };
 }
 
-// ======================================================
-// DISCORD EMBED
-// ======================================================
+// EMBED
 
 function createEmbed(
   server,
@@ -732,9 +698,16 @@ function createEmbed(
     getRam(resources);
 
   const serverName =
-    server?.alias ??
-    server?.name ??
-    SERVER_FALLBACK_NAME;
+    server &&
+    (
+      server.alias ||
+      server.name
+    )
+      ? (
+          server.alias ||
+          server.name
+        )
+      : SERVER_FALLBACK_NAME;
 
   const status =
     getStatusText(online);
@@ -746,20 +719,15 @@ function createEmbed(
       resources
     );
 
-  let systemText;
+  let systemText = "OFFLINE";
 
   if (online) {
-    systemText =
-      "ONLINE";
+    systemText = "ONLINE";
   } else if (
     state === "starting" ||
     state === "start"
   ) {
-    systemText =
-      "STARTING";
-  } else {
-    systemText =
-      "OFFLINE";
+    systemText = "STARTING";
   }
 
   return new EmbedBuilder()
@@ -781,8 +749,7 @@ function createEmbed(
     .addFields(
       {
         name: "SERVER ADDRESS",
-        value:
-          SERVER_IP,
+        value: SERVER_IP,
         inline: false
       },
       {
@@ -796,20 +763,17 @@ function createEmbed(
       },
       {
         name: "CPU LOAD",
-        value:
-          cpu,
+        value: cpu,
         inline: true
       },
       {
         name: "MEMORY",
-        value:
-          ram,
+        value: ram,
         inline: true
       },
       {
         name: "RESPAWNHOST STATE",
-        value:
-          state || "unknown",
+        value: state || "unknown",
         inline: true
       }
     )
@@ -821,9 +785,7 @@ function createEmbed(
     .setTimestamp();
 }
 
-// ======================================================
-// DISCORD STATUS MESSAGE
-// ======================================================
+// STATUS MESSAGE
 
 let statusMessageId = null;
 
@@ -884,11 +846,12 @@ async function updateStatus() {
         });
 
       message =
-        messages.find(
-          (msg) =>
+        messages.find(function (msg) {
+          return (
             msg.author.id ===
             discord.user.id
-        );
+          );
+        });
     }
 
     if (message) {
@@ -902,6 +865,7 @@ async function updateStatus() {
       console.log(
         "Statusnachricht aktualisiert."
       );
+
     } else {
       const newMessage =
         await channel.send({
@@ -915,6 +879,7 @@ async function updateStatus() {
         "Neue Statusnachricht erstellt."
       );
     }
+
   } catch (error) {
     console.error(
       "Fehler beim Status-Update:",
@@ -923,9 +888,7 @@ async function updateStatus() {
   }
 }
 
-// ======================================================
 // SLASH COMMAND
-// ======================================================
 
 const statusCommand =
   new SlashCommandBuilder()
@@ -934,9 +897,7 @@ const statusCommand =
       "Zeigt den aktuellen Minecraft Server Status."
     );
 
-// ======================================================
-// COMMAND REGISTRIEREN
-// ======================================================
+// COMMANDS REGISTRIEREN
 
 async function registerCommands() {
   try {
@@ -961,6 +922,7 @@ async function registerCommands() {
     console.log(
       "Slash Command /status registriert."
     );
+
   } catch (error) {
     console.error(
       "Fehler beim Registrieren der Slash Commands:",
@@ -969,13 +931,11 @@ async function registerCommands() {
   }
 }
 
-// ======================================================
 // INTERACTION
-// ======================================================
 
 discord.on(
   "interactionCreate",
-  async (interaction) => {
+  async function (interaction) {
     try {
       if (
         !interaction.isChatInputCommand()
@@ -1011,6 +971,7 @@ discord.on(
           embeds: [embed]
         });
       }
+
     } catch (error) {
       console.error(
         "Fehler bei Interaction:",
@@ -1042,13 +1003,11 @@ discord.on(
   }
 );
 
-// ======================================================
-// BOT READY
-// ======================================================
+// READY
 
 discord.once(
   "clientReady",
-  async () => {
+  async function () {
     console.log(
       "Discord Bot ist vollständig verbunden."
     );
@@ -1074,13 +1033,11 @@ discord.once(
   }
 );
 
-// ======================================================
 // PROCESS ERROR HANDLER
-// ======================================================
 
 process.on(
   "unhandledRejection",
-  (error) => {
+  function (error) {
     console.error(
       "Unhandled Promise Rejection:",
       error
@@ -1090,7 +1047,7 @@ process.on(
 
 process.on(
   "uncaughtException",
-  (error) => {
+  function (error) {
     console.error(
       "Uncaught Exception:",
       error
@@ -1098,9 +1055,7 @@ process.on(
   }
 );
 
-// ======================================================
-// BOT LOGIN
-// ======================================================
+// LOGIN
 
 console.log(
   "Starte Discord Bot..."
@@ -1108,15 +1063,14 @@ console.log(
 
 discord
   .login(DISCORD_TOKEN)
-  .then(() => {
+  .then(function () {
     console.log(
       "Discord Login erfolgreich."
     );
   })
-  .catch((error) => {
+  .catch(function (error) {
     console.error(
       "Discord Login fehlgeschlagen:",
       error
     );
   });
-```
