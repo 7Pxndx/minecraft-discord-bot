@@ -694,8 +694,8 @@ function createEmbed(
 
   const statusColor =
     online
-      ? 0x22c55e
-      : 0xef4444;
+      ? 0x57F287
+      : 0xED4245;
 
   const statusIcon =
     online
@@ -714,7 +714,7 @@ function createEmbed(
       resources
     );
 
-  let playerText = "N/A";
+  let playerText = "0";
 
   if (players !== null) {
     if (maxPlayers !== null) {
@@ -727,16 +727,14 @@ function createEmbed(
   }
 
   let stateText =
-    state || "unknown";
+    online
+      ? "Online"
+      : "Offline";
 
-  if (state === "running") {
-    stateText = "Online";
-  } else if (state === "starting") {
+  if (state === "starting") {
     stateText = "Startet...";
   } else if (state === "stopping") {
     stateText = "Stoppt...";
-  } else if (state === "offline") {
-    stateText = "Offline";
   }
 
   return new EmbedBuilder()
@@ -748,39 +746,37 @@ function createEmbed(
       `${statusIcon} ${serverName}`
     )
     .setDescription(
-      `**${statusText}** · Minecraft Server\n\n` +
-      `🌐 **Server-Adresse**\n` +
+      `**${statusText}**\n` +
+      `Minecraft Java Server\n\n` +
+      `🌐 **SERVER-IP**\n` +
       `\`${SERVER_IP}\``
     )
     .addFields(
       {
-        name: "👥 Spieler",
-        value:
-          `**${playerText}**`,
+        name: "👥  SPIELER",
+        value: `**${playerText}**`,
         inline: true
       },
       {
-        name: "🖥️ CPU",
-        value:
-          `**${cpu}**`,
+        name: "⚡  CPU",
+        value: `**${cpu}**`,
         inline: true
       },
       {
-        name: "💾 RAM",
-        value:
-          `**${ram}**`,
+        name: "💾  RAM",
+        value: `**${ram}**`,
         inline: true
       },
       {
-        name: "⚡ Server",
+        name: "STATUS",
         value:
-          `**${stateText}**`,
+          `${statusIcon} **${stateText}**`,
         inline: false
       }
     )
     .setFooter({
       text:
-        "BLOCKBANDE NETWORK • Server Monitor"
+        "BLOCKBANDE NETWORK  •  Minecraft Server"
     })
     .setTimestamp();
 }
@@ -1012,6 +1008,20 @@ discord.once(
       "Discord Bot ist vollständig verbunden."
     );
 
+    discord.user.setPresence({
+      status: "online",
+      activities: [
+        {
+          name: "BLOCKBANDE NETWORK",
+          type: 0
+        }
+      ]
+    });
+
+    console.log(
+      "Discord Status: ONLINE"
+    );
+
     console.log(
       "Bot:",
       discord.user.tag
@@ -1073,3 +1083,4 @@ discord
       "Discord Login fehlgeschlagen:",
       error
     );
+  });
