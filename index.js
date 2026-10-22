@@ -674,26 +674,6 @@ function createEmbed(
       details
     );
 
-  let playerText = "N/A";
-
-  if (players !== null) {
-    if (maxPlayers !== null) {
-      playerText =
-        players +
-        " / " +
-        maxPlayers;
-    } else {
-      playerText =
-        String(players);
-    }
-  }
-
-  const playerBar =
-    getPlayerBar(
-      players,
-      maxPlayers
-    );
-
   const cpu =
     getCpu(resources);
 
@@ -712,8 +692,20 @@ function createEmbed(
         )
       : SERVER_FALLBACK_NAME;
 
-  const status =
-    getStatusText(online);
+  const statusColor =
+    online
+      ? 0x22c55e
+      : 0xef4444;
+
+  const statusIcon =
+    online
+      ? "🟢"
+      : "🔴";
+
+  const statusText =
+    online
+      ? "ONLINE"
+      : "OFFLINE";
 
   const state =
     getServerState(
@@ -722,68 +714,73 @@ function createEmbed(
       resources
     );
 
-  let systemText = "OFFLINE";
+  let playerText = "N/A";
 
-  if (online) {
-    systemText = "ONLINE";
-  } else if (
-    state === "starting" ||
-    state === "start"
-  ) {
-    systemText = "STARTING";
+  if (players !== null) {
+    if (maxPlayers !== null) {
+      playerText =
+        `${players} / ${maxPlayers}`;
+    } else {
+      playerText =
+        String(players);
+    }
+  }
+
+  let stateText =
+    state || "unknown";
+
+  if (state === "running") {
+    stateText = "Online";
+  } else if (state === "starting") {
+    stateText = "Startet...";
+  } else if (state === "stopping") {
+    stateText = "Stoppt...";
+  } else if (state === "offline") {
+    stateText = "Offline";
   }
 
   return new EmbedBuilder()
-    .setColor(status.color)
+    .setColor(statusColor)
     .setAuthor({
-      name:
-        NETWORK_NAME +
-        " - SERVER MONITOR"
+      name: "BLOCKBANDE NETWORK"
     })
     .setTitle(
-      "Minecraft Server: " +
-      serverName
+      `${statusIcon} ${serverName}`
     )
     .setDescription(
-      systemText +
-      "\n" +
-      status.description
+      `**${statusText}** · Minecraft Server\n\n` +
+      `🌐 **Server-Adresse**\n` +
+      `\`${SERVER_IP}\``
     )
     .addFields(
       {
-        name: "SERVER ADDRESS",
-        value: SERVER_IP,
-        inline: false
-      },
-      {
-        name: "PLAYERS",
+        name: "👥 Spieler",
         value:
-          playerText +
-          "\n[" +
-          playerBar +
-          "]",
+          `**${playerText}**`,
         inline: true
       },
       {
-        name: "CPU LOAD",
-        value: cpu,
+        name: "🖥️ CPU",
+        value:
+          `**${cpu}**`,
         inline: true
       },
       {
-        name: "MEMORY",
-        value: ram,
+        name: "💾 RAM",
+        value:
+          `**${ram}**`,
         inline: true
       },
       {
-        name: "RESPAWNHOST STATE",
-        value: state || "unknown",
-        inline: true
+        name: "⚡ Server",
+        value:
+          `**${stateText}**`,
+        inline: false
       }
     )
     .setFooter({
       text:
-        NETWORK_NAME +
-        " | Automatic Server Monitor"
+        "BLOCKBANDE NETWORK • Server Monitor"
     })
     .setTimestamp();
 }
@@ -1076,4 +1073,3 @@ discord
       "Discord Login fehlgeschlagen:",
       error
     );
-  });
